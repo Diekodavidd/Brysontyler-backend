@@ -1,11 +1,16 @@
 const { MailerSend, EmailParams, Sender, Recipient } = require('mailersend');
 require('dotenv').config();
 
+console.log("API KEY:", process.env.MAILERSEND_API_KEY);
+console.log("FROM EMAIL:", process.env.MAIL_FROM_EMAIL);
+console.log("FROM NAME:", process.env.MAIL_FROM_NAME);
 const mailerSend = new MailerSend({
 apiKey: process.env.MAILERSEND_API_KEY,
 });
 
 exports.sendEmail = async ({ to, subject, html }) => {
+
+    
 
     try {
 

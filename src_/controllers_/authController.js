@@ -87,7 +87,8 @@ const user = await User.findOne({
 });if (!user) return res.status(404).json({ error: 'User not found' });
 
 const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '15m' });
-const resetLink = `${process.env.BACKEND_URL}/reset-password/${resetToken}`;
+const resetLink =
+`${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
 await sendEmail({
 to: email,
@@ -172,3 +173,208 @@ exports.resetPassword = async (req, res) => {
 exports.getMe = async (req, res) => {
     res.json(req.user);
 };
+
+exports.completeProfile = async (req, res) => {
+    try {
+
+        const {
+            phoneNumber,
+            dateOfBirth,
+            gender,
+            country,
+            state,
+            city,
+            bio
+        } = req.body;
+
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            return res.status(404).json({
+                error: "User not found"
+            });
+        }
+
+        user.phoneNumber = phoneNumber;
+        user.dateOfBirth = dateOfBirth;
+        user.gender = gender;
+        user.country = country;
+        user.state = state;
+        user.city = city;
+        user.bio = bio;
+        user.profileCompleted = true;
+
+        await user.save();
+
+        res.json({
+            success: true,
+            message: "Profile completed successfully."
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            error: error.message
+        });
+
+    }
+};
+
+const cloudinary = require("../utils_/cloudinary");
+
+exports.uploadProfileImage = async (req, res) => {
+    try {
+
+        if (!req.file) {
+            return res.status(400).json({
+                error: "Image is required."
+            });
+        }
+
+        const result = await cloudinary.uploader.upload(
+            req.file.path,
+            {
+                folder: "brysontyler/profile-images"
+            }
+        );
+
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                profileImage: result.secure_url
+            },
+            {
+                new: true
+            }
+        );
+
+        res.json({
+            success: true,
+            profileImage: user.profileImage
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            error: error.message
+        });
+
+    }
+};
+
+exports.uploadCoverImage = async (req, res) => {
+    try {
+
+        if (!req.file) {
+            return res.status(400).json({
+                error: "Image is required."
+            });
+        }
+
+        const result = await cloudinary.uploader.upload(
+            req.file.path,
+            {
+                folder: "brysontyler/cover-images"
+            }
+        );
+
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            {
+                coverImage: result.secure_url
+            },
+            {
+                new: true
+            }
+        );
+
+        res.json({
+            success: true,
+            coverImage: user.coverImage
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            error: error.message
+        });
+
+    }
+};
+
+exports.getOnboardingStatus = async (req, res) => {
+
+    try {
+
+        const user = await User.findById(req.user._id);
+
+        res.json({
+
+            profileCompleted: user.profileCompleted,
+
+            profileImageUploaded: !!user.profileImage,
+
+            coverImageUploaded: !!user.coverImage,
+
+            kycStatus: user.kyc?.status || "pending",
+
+            creatorVerified:
+                user.creatorVerification?.verified || false
+
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            error: error.message
+        });
+
+    }
+
+};
+
+exports.submitCreatorVerification = async (req, res) => {
+
+    try {
+
+        const {
+            stageName,
+            category,
+            socialLinks
+        } = req.body;
+
+        const user = await User.findById(req.user._id);
+
+        user.creatorVerification = {
+
+            stageName,
+
+            category,
+
+            socialLinks,
+
+            verified: false
+
+        };
+
+        await user.save();
+
+        res.json({
+
+            success: true,
+
+            message:
+                "Creator verification submitted."
+
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            error: error.message
+        });
+
+    }
+
+};
+
