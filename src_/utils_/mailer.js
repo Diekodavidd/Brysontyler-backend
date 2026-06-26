@@ -1,53 +1,39 @@
-const { MailerSend, EmailParams, Sender, Recipient } = require('mailersend');
-require('dotenv').config();
+const Brevo = require("@getbrevo/brevo");
+require("dotenv").config();
 
-console.log("API KEY:", process.env.MAILERSEND_API_KEY);
+console.log("API KEY:", process.env.BREVO_API_KEY);
 console.log("FROM EMAIL:", process.env.MAIL_FROM_EMAIL);
 console.log("FROM NAME:", process.env.MAIL_FROM_NAME);
-const mailerSend = new MailerSend({
-apiKey: process.env.MAILERSEND_API_KEY,
-});
+
+const apiInstance = new Brevo.TransactionalEmailsApi();
+
+apiInstance.setApiKey(
+  Brevo.TransactionalEmailsApiApiKeys.apiKey,
+  process.env.BREVO_API_KEY
+);
 
 exports.sendEmail = async ({ to, subject, html }) => {
+  try {
+    const sendSmtpEmail = new Brevo.SendSmtpEmail();
 
-    
+    sendSmtpEmail.subject = subject;
 
-    try {
+    sendSmtpEmail.htmlContent = html;
 
-        const sentFrom = new Sender(
+    sendSmtpEmail.sender = {
+      name: process.env.MAIL_FROM_NAME,
+      email: process.env.MAIL_FROM_EMAIL,
+    };
 
-            process.env.MAIL_FROM_EMAIL,
+    sendSmtpEmail.to = [
+      {
+        email: to,
+      },
+    ];
 
-            process.env.MAIL_FROM_NAME
-
-        );
-
-        const recipients = [
-
-            new Recipient(to)
-
-        ];
-
-        const emailParams = new EmailParams()
-
-            .setFrom(sentFrom)
-
-            .setTo(recipients)
-
-            .setSubject(subject)
-
-            .setHtml(html);
-
-        return await mailerSend.email.send(emailParams);
-
-    }
-
-    catch(error){
-
-        console.error(error);
-
-        throw error;
-
-    }
-
+    return await apiInstance.sendTransacEmail(sendSmtpEmail);
+  } catch (error) {
+    console.error(error.response?.body || error);
+    throw error;
+  }
 };
