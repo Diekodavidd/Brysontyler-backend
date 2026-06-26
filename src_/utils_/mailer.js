@@ -1,39 +1,26 @@
-const Brevo = require("@getbrevo/brevo");
+const nodemailer = require("nodemailer");
 require("dotenv").config();
 
-console.log("API KEY:", process.env.BREVO_API_KEY);
-console.log("FROM EMAIL:", process.env.MAIL_FROM_EMAIL);
-console.log("FROM NAME:", process.env.MAIL_FROM_NAME);
-
-const apiInstance = new Brevo.TransactionalEmailsApi();
-
-apiInstance.setApiKey(
-  Brevo.TransactionalEmailsApiApiKeys.apiKey,
-  process.env.BREVO_API_KEY
-);
+const transporter = nodemailer.createTransport({
+  host: "smtp-relay.brevo.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.BREVO_SMTP_LOGIN,
+    pass: process.env.BREVO_SMTP_KEY,
+  },
+});
 
 exports.sendEmail = async ({ to, subject, html }) => {
   try {
-    const sendSmtpEmail = new Brevo.SendSmtpEmail();
-
-    sendSmtpEmail.subject = subject;
-
-    sendSmtpEmail.htmlContent = html;
-
-    sendSmtpEmail.sender = {
-      name: process.env.MAIL_FROM_NAME,
-      email: process.env.MAIL_FROM_EMAIL,
-    };
-
-    sendSmtpEmail.to = [
-      {
-        email: to,
-      },
-    ];
-
-    return await apiInstance.sendTransacEmail(sendSmtpEmail);
-  } catch (error) {
-    console.error(error.response?.body || error);
-    throw error;
+    return await transporter.sendMail({
+      from: `"${process.env.MAIL_FROM_NAME}" <${process.env.MAIL_FROM_EMAIL}>`,
+      to,
+      subject,
+      html,
+    });
+  } catch (err) {
+    console.error(err);
+    throw err;
   }
 };
