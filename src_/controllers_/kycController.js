@@ -1,35 +1,89 @@
+const axios = require ("axios");
+
 exports.startKYC = async (req, res) => {
     try {
 
         if (!req.user) {
             return res.status(401).json({
-                error: "Unauthorized."
+                error: "Unauthorized"
             });
         }
 
         if (req.user.isKYCVerified) {
             return res.status(400).json({
-                error: "KYC has already been completed."
+                error: "User already verified."
             });
         }
 
-        const verificationUrl =
-            `${process.env.DIDIT_KYC_URL}?userId=${req.user._id}`;
+        const response = await axios.post(
+            "https://verification.didit.me/v3/session/",
+            {
 
-        res.json({
+                workflow_id: process.env.DIDIT_WORKFLOW_ID,
+
+                vendor_data: req.user._id.toString(),
+
+                callback: `${process.env.FRONTEND_URL}/kyc-complete`,
+
+                callback_method: "both",
+
+                language: "en",
+
+                metadata: {
+
+                    userId: req.user._id
+
+                },
+
+                contact_details: {
+
+                    email: req.user.email,
+
+                    send_notification_emails: false
+
+                }
+
+            },
+
+            {
+
+                headers: {
+
+                    "x-api-key": process.env.DIDIT_API_KEY,
+
+                    "Content-Type": "application/json"
+
+                }
+
+            }
+
+        );
+
+        return res.json({
+
             success: true,
-            verificationUrl
-        });
 
-    } catch (error) {
+            sessionId: response.data.session_id,
 
-        res.status(500).json({
-            error: error.message
+            verificationUrl: response.data.url
+
         });
 
     }
-};
 
+    catch(error){
+
+        console.error(error.response?.data || error);
+
+        return res.status(500).json({
+
+            error:error.response?.data || error.message
+
+        });
+
+    }
+
+};
 const User = require("../models_/user");
 
 exports.diditWebhook = async (req, res) => {
