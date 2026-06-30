@@ -386,7 +386,6 @@ exports.savePaymentMethod = async (req, res) => {
 };
 
 
-const Payment = require("../models_/payment");
 const Subscription = require("../models_/subscription");
 
 exports.getActivity = async (req, res) => {
