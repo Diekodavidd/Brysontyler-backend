@@ -80,6 +80,8 @@ exports.startKYC = async (req, res) => {
 const User = require("../models_/user");
 
 exports.diditWebhook = async (req, res) => {
+console.log("DIDIT WEBHOOK RECEIVED");
+console.log(req.body);
 
     try {
 
