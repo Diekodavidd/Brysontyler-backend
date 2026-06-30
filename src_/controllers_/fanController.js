@@ -61,29 +61,29 @@ profileImage: req.user.profileImage,
 // ==============================
 
 exports.getProfile = async (req, res) => {
+  try {
 
-    try {
+    const user = await User.findById(req.user._id)
+      .select("-password");
 
-        res.json({
-
-            success: true,
-
-            user: req.user
-
-        });
-
+    if (!user) {
+      return res.status(404).json({
+        error: "User not found"
+      });
     }
 
-    catch (error) {
+    res.json({
+      success: true,
+      user
+    });
 
-        res.status(500).json({
+  } catch (error) {
 
-            error: error.message
+    res.status(500).json({
+      error: error.message
+    });
 
-        });
-
-    }
-
+  }
 };
 
 
@@ -383,4 +383,59 @@ exports.savePaymentMethod = async (req, res) => {
 
     }
 
+};
+
+
+const Payment = require("../models_/payment");
+const Subscription = require("../models_/subscription");
+
+exports.getActivity = async (req, res) => {
+  try {
+    const payments = await Payment.find({
+      userId: req.user._id,
+    })
+      .populate("creatorId", "name")
+      .sort({ createdAt: -1 });
+
+    const subscriptions = await Subscription.find({
+      fanId: req.user._id,
+    })
+      .populate("creatorId", "name")
+      .sort({ createdAt: -1 });
+
+    const activity = [
+      ...payments.map((payment) => ({
+        _id: payment._id,
+        type: "payment",
+        creator: payment.creatorId,
+        amount: payment.amount,
+        status: payment.paymentStatus,
+        paymentType: payment.paymentType,
+        createdAt: payment.createdAt,
+      })),
+
+      ...subscriptions.map((subscription) => ({
+        _id: subscription._id,
+        type: "subscription",
+        creator: subscription.creatorId,
+        amount: subscription.amount,
+        status: subscription.status,
+        endDate: subscription.endDate,
+        createdAt: subscription.createdAt,
+      })),
+    ].sort(
+      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+    );
+
+    res.json({
+      success: true,
+      payments: payments.length,
+      subscriptions: subscriptions.length,
+      activity,
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+    });
+  }
 };

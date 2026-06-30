@@ -12,7 +12,8 @@ const {
     getPreferences,
     updatePreferences,
     getPaymentMethods,
-    savePaymentMethod
+    savePaymentMethod,
+    getActivity
 } = require("../controllers_/fanController");
 
 router.get("/dashboard", auth, getDashboard);
@@ -32,5 +33,11 @@ router.patch("/preferences", auth, updatePreferences);
 router.get("/payment-methods", auth, getPaymentMethods);
 
 router.post("/payment-methods", auth, savePaymentMethod);
+
+router.get(
+  "/activity",
+  auth,
+  getActivity
+);
 
 module.exports = router;
