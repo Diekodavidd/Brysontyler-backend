@@ -42,7 +42,12 @@ if (!name || !email || !password) {
 await user.save();
 
 const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-res.status(201).json({ token, user: { id: user._id, name: user.name, role: user.role } });
+const safeUser = await User.findById(user._id).select("-password");
+
+res.status(201).json({
+    token,
+    user: safeUser
+});
 } catch (error) {
 res.status(500).json({ error: error.message });
 }
@@ -71,8 +76,12 @@ const isMatch = await bcrypt.compare(password, user.password);
 if (!isMatch) return res.status(400).json({ error: 'Invalid credentials' });
 
 const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
-res.json({ token, user: { id: user._id, name: user.name, role: user.role } });
-} catch (error) {
+const safeUser = await User.findById(user._id).select("-password");
+
+res.json({
+    token,
+    user: safeUser
+});} catch (error) {
 res.status(500).json({ error: error.message });
 }
 };
@@ -171,7 +180,12 @@ exports.resetPassword = async (req, res) => {
 };
 
 exports.getMe = async (req, res) => {
-    res.json(req.user);
+
+    const user = await User.findById(req.user._id)
+        .select("-password");
+
+    res.json(user);
+
 };
 
 exports.completeProfile = async (req, res) => {
