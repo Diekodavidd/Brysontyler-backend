@@ -15,84 +15,67 @@ exports.startKYC = async (req, res) => {
             });
         }
 
+        // Default callback is onboarding
+        // Restart KYC can override this
+        const callback =
+            req.body.callback ||
+            `${process.env.FRONTEND_URL}/kyc-complete`;
+
         const response = await axios.post(
             "https://verification.didit.me/v3/session/",
             {
-
                 workflow_id: process.env.DIDIT_WORKFLOW_ID,
 
                 vendor_data: req.user._id.toString(),
 
-                callback: `${process.env.FRONTEND_URL}/kyc-complete`,
+                callback,
 
                 callback_method: "both",
 
                 language: "en",
 
                 metadata: {
-
                     userId: req.user._id
-
                 },
 
                 contact_details: {
-
                     email: req.user.email,
-
                     send_notification_emails: false
-
                 }
-
             },
-
             {
-
                 headers: {
-
                     "x-api-key": process.env.DIDIT_API_KEY,
-
                     "Content-Type": "application/json"
-
                 }
-
             }
-
         );
 
         const user = await User.findById(req.user._id);
 
-user.didit.workflowId = process.env.DIDIT_WORKFLOW_ID;
-user.didit.sessionId = response.data.session_id;
-user.didit.sessionToken = response.data.token || "";
-user.didit.verificationUrl = response.data.url;
-user.didit.status = "pending";
+        user.didit.workflowId = process.env.DIDIT_WORKFLOW_ID;
+        user.didit.sessionId = response.data.session_id;
+        user.didit.sessionToken = response.data.token || "";
+        user.didit.verificationUrl = response.data.url;
+        user.didit.status = "pending";
 
-await user.save();
+        await user.save();
 
         return res.json({
-
             success: true,
-
             sessionId: response.data.session_id,
-
             verificationUrl: response.data.url
-
         });
 
-    }
-
-    catch(error){
+    } catch (error) {
 
         console.error(error.response?.data || error);
 
         return res.status(500).json({
-
-            error:error.response?.data || error.message
-
+            error: error.response?.data || error.message
         });
 
     }
-
 };
 const User = require("../models_/user");
 
