@@ -200,32 +200,37 @@ exports.getKYCStatus = async (req, res) => {
 
 };
 
+// exports.restartKYC = async (req, res) => {
+
+//     try {
+
+//         if (req.user.isKYCVerified) {
+//             return res.status(400).json({
+//                 error: "KYC already completed."
+//             });
+//         }
+
+//         const verificationUrl =
+//             `${process.env.DIDIT_KYC_URL}?userId=${req.user._id}`;
+
+//         res.json({
+//             success: true,
+//             verificationUrl
+//         });
+
+//     } catch (error) {
+
+//         res.status(500).json({
+//             error: error.message
+//         });
+
+//     }
+
+// };
+
+
 exports.restartKYC = async (req, res) => {
-
-    try {
-
-        if (req.user.isKYCVerified) {
-            return res.status(400).json({
-                error: "KYC already completed."
-            });
-        }
-
-        const verificationUrl =
-            `${process.env.DIDIT_KYC_URL}?userId=${req.user._id}`;
-
-        res.json({
-            success: true,
-            verificationUrl
-        });
-
-    } catch (error) {
-
-        res.status(500).json({
-            error: error.message
-        });
-
-    }
-
+    return exports.startKYC(req, res);
 };
 
 exports.updateCreatorProfile = async (req, res) => {
