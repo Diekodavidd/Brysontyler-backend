@@ -103,7 +103,54 @@ const UserSchema = new mongoose.Schema({
     },
 
 
+// ==========================
+// FAN SETTINGS
+// ==========================
 
+preferences: {
+
+    darkMode: {
+        type: Boolean,
+        default: true
+    },
+
+    autoplay: {
+        type: Boolean,
+        default: true
+    },
+
+    emailNotifications: {
+        type: Boolean,
+        default: true
+    },
+
+    pushNotifications: {
+        type: Boolean,
+        default: true
+    }
+
+},
+
+paymentMethods: [
+
+    {
+
+        provider: String,
+
+        accountName: String,
+
+        accountNumber: String,
+
+        walletAddress: String,
+
+        isDefault: {
+            type: Boolean,
+            default: false
+        }
+
+    }
+
+],
     // ==========================
     // KYC
     // (KEEP THESE FOR OLD CONTROLLERS)
