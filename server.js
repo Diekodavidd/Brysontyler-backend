@@ -31,6 +31,7 @@ app.use('/coins', require('./src_/routes_/coinRoutes'));
 app.use('/models', require('./src_/routes_/modelRoutes'));
 app.use('/collaboration', require('./src_/routes_/collaborationRoutes'));
 app.use('/twitter', require('./src_/routes_/twitterRoutes'));
+app.use('/fan', require('./src_/routes_/fanRoutes'));
 
 // WebSocket Chat
 io.on('connection', (socket) => {
