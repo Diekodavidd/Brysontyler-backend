@@ -154,61 +154,7 @@ exports.nowPaymentsWebhook = async (req, res) => {
 };
 
 
-exports.diditWebhook = async (req, res) => {
 
-    try {
-
-        const {
-
-            userId,
-
-            status
-
-        } = req.body;
-
-        if (!userId || !status) {
-
-            return res.status(400).json({
-
-                error: "Invalid webhook payload."
-
-            });
-
-        }
-
-        const user = await User.findById(userId);
-
-        if (!user) {
-
-            return res.status(404).json({
-
-                error: "User not found."
-
-            });
-
-        }
-
-        if (status === "approved") {
-
-            user.isKYCVerified = true;
-
-            await user.save();
-
-        }
-
-        res.sendStatus(200);
-
-    }
-
-    catch (error) {
-
-        console.error(error);
-
-        res.sendStatus(500);
-
-    }
-
-};
 
 exports.getPaymentStatus = async (req,res)=>{
 

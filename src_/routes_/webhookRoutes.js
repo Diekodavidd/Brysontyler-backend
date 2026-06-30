@@ -3,7 +3,6 @@ const router = express.Router();
 
 const {
     nowPaymentsWebhook,
-    diditWebhook,
     getPaymentStatus,
     verifySubscription
 } = require("../controllers_/webhookController");
@@ -12,7 +11,6 @@ const auth = require("../middleware_/authMiddleware");
 
 // Webhooks (called by external services)
 router.post("/nowpayments", nowPaymentsWebhook);
-router.post("/didit", diditWebhook);
 
 // User endpoints
 router.get(

@@ -59,6 +59,16 @@ exports.startKYC = async (req, res) => {
 
         );
 
+        const user = await User.findById(req.user._id);
+
+user.didit.workflowId = process.env.DIDIT_WORKFLOW_ID;
+user.didit.sessionId = response.data.session_id;
+user.didit.sessionToken = response.data.token || "";
+user.didit.verificationUrl = response.data.url;
+user.didit.status = "pending";
+
+await user.save();
+
         return res.json({
 
             success: true,
@@ -87,31 +97,54 @@ exports.startKYC = async (req, res) => {
 const User = require("../models_/user");
 
 exports.diditWebhook = async (req, res) => {
+
     try {
 
-        const { userId, status } = req.body;
+        const sessionId = req.body.session_id;
 
-        if (!userId || !status) {
-            return res.status(400).json({
-                error: "Missing webhook data."
-            });
-        }
+        const status =
+            req.body.review?.status ||
+            req.body.status;
 
-        const user = await User.findById(userId);
+        const user = await User.findOne({
+            "didit.sessionId": sessionId
+        });
 
         if (!user) {
+
             return res.status(404).json({
                 error: "User not found."
             });
+
         }
 
         if (status === "approved") {
 
             user.isKYCVerified = true;
 
-        } else if (status === "rejected") {
+            user.kycStatus = "approved";
+
+            user.didit.status = "approved";
+
+            user.didit.verifiedAt = new Date();
+
+            user.creatorVerification.verified = true;
+
+            user.isVerifiedCreator = true;
+
+        }
+
+        if (status === "rejected") {
 
             user.isKYCVerified = false;
+
+            user.kycStatus = "rejected";
+
+            user.didit.status = "rejected";
+
+            user.creatorVerification.verified = false;
+
+            user.isVerifiedCreator = false;
 
         }
 
@@ -119,28 +152,48 @@ exports.diditWebhook = async (req, res) => {
 
         res.sendStatus(200);
 
-    } catch (error) {
+    }
 
-        res.status(500).json({
-            error: error.message
-        });
+    catch (error) {
+
+        console.error(error);
+
+        res.sendStatus(500);
 
     }
+
 };
 
 exports.getKYCStatus = async (req, res) => {
 
     try {
 
+        const user = await User.findById(req.user._id);
+
         res.json({
+
             success: true,
-            isKYCVerified: req.user.isKYCVerified
+
+            isKYCVerified: user.isKYCVerified,
+
+            kycStatus: user.kycStatus,
+
+            didit: user.didit,
+
+            creatorVerification: user.creatorVerification,
+
+            isVerifiedCreator: user.isVerifiedCreator
+
         });
 
-    } catch (error) {
+    }
+
+    catch (error) {
 
         res.status(500).json({
+
             error: error.message
+
         });
 
     }
@@ -172,5 +225,28 @@ exports.restartKYC = async (req, res) => {
         });
 
     }
+
+};
+
+exports.updateCreatorProfile = async (req, res) => {
+
+    const user = await User.findById(req.user._id);
+
+    user.creatorVerification.stageName =
+        req.body.stageName;
+
+    user.creatorVerification.category =
+        req.body.category;
+
+    user.creatorVerification.socialLinks =
+        req.body.socialLinks;
+
+    await user.save();
+
+    res.json({
+        success: true,
+        creatorVerification:
+            user.creatorVerification
+    });
 
 };
