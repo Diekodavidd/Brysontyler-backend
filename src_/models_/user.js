@@ -66,7 +66,24 @@ const UserSchema = new mongoose.Schema({
     },
 
 
+membership: {
 
+    plan: {
+        type: String,
+        enum: ["FREE", "VIP", "Elite"],
+        default: "FREE"
+    },
+
+    status: {
+        type: String,
+        default: "active"
+    },
+
+    startDate: Date,
+
+    endDate: Date
+
+},
     // ==========================
     // CREATOR
     // ==========================

@@ -2,6 +2,7 @@ const User = require('../models_/user');
 const Subscription = require('../models_/subscription');
 const crypto = require("crypto");
 const Payment = require("../models_/payment");
+const Membership = require("../models_/membership");
 
 
 exports.nowPaymentsWebhook = async (req, res) => {
@@ -68,6 +69,43 @@ exports.nowPaymentsWebhook = async (req, res) => {
         payment.paymentStatus = payment_status;
 
         await payment.save();
+
+        const membership =
+    await Membership.findOne({
+
+        orderId: order_id
+
+    });
+
+if (
+    membership &&
+    payment_status === "finished"
+) {
+
+    membership.status = "active";
+
+    membership.startDate = new Date();
+
+    membership.endDate = new Date(
+        Date.now() +
+        30 * 24 * 60 * 60 * 1000
+    );
+
+    await membership.save();
+
+    await User.findByIdAndUpdate(
+        membership.userId,
+        {
+            membership: {
+                plan: membership.plan,
+                status: "active",
+                expiresAt:
+                    membership.endDate,
+            },
+        }
+    );
+
+}
 
         if (payment_status !== "finished") {
 
