@@ -80,41 +80,44 @@ exports.startKYC = async (req, res) => {
 const User = require("../models_/user");
 
 exports.diditWebhook = async (req, res) => {
-console.log("DIDIT WEBHOOK RECEIVED");
-console.log(req.body);
-
     try {
 
-        const sessionId = req.body.session_id;
+        console.log("DIDIT WEBHOOK RECEIVED");
+        console.log(req.body);
 
-        const status =
-            req.body.review?.status ||
-            req.body.status;
+        const status = (
+            req.body.status ||
+            req.body.decision?.status ||
+            ""
+        ).toLowerCase();
 
-        const user = await User.findOne({
-            "didit.sessionId": sessionId
-        });
+        const userId =
+            req.body.metadata?.userId ||
+            req.body.vendor_data;
+
+        if (!userId) {
+            return res.status(400).json({
+                error: "Missing userId."
+            });
+        }
+
+        const user = await User.findById(userId);
 
         if (!user) {
-
             return res.status(404).json({
                 error: "User not found."
             });
-
         }
+
+        user.didit.status = status;
 
         if (status === "approved") {
 
             user.isKYCVerified = true;
-
             user.kycStatus = "approved";
-
-            user.didit.status = "approved";
-
             user.didit.verifiedAt = new Date();
 
             user.creatorVerification.verified = true;
-
             user.isVerifiedCreator = true;
 
         }
@@ -122,31 +125,27 @@ console.log(req.body);
         if (status === "rejected") {
 
             user.isKYCVerified = false;
-
             user.kycStatus = "rejected";
 
-            user.didit.status = "rejected";
-
             user.creatorVerification.verified = false;
-
             user.isVerifiedCreator = false;
 
         }
 
         await user.save();
+        console.log(user);
+
+        console.log("UPDATED USER:", user.didit.status);
 
         res.sendStatus(200);
 
-    }
+    } catch (err) {
 
-    catch (error) {
-
-        console.error(error);
+        console.error(err);
 
         res.sendStatus(500);
 
     }
-
 };
 
 exports.getKYCStatus = async (req, res) => {
