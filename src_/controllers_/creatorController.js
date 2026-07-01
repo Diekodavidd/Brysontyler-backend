@@ -1,4 +1,6 @@
 const Content = require('../models_/content');
+const User = require("../models_/user");
+
 
 exports.getDashboard = async (req, res) => {
     try {
@@ -78,20 +80,41 @@ exports.getProfile = async (req, res) => {
     }
 };
 
+
 exports.updateProfile = async (req, res) => {
     try {
 
         const user = await User.findById(req.user._id);
 
-        if (req.body.name) {
-            user.name = req.body.name.trim();
+        if (!user) {
+            return res.status(404).json({
+                error: "User not found"
+            });
         }
+
+        user.name = req.body.name ?? user.name;
+        user.phoneNumber = req.body.phoneNumber ?? user.phoneNumber;
+        user.bio = req.body.bio ?? user.bio;
+        user.country = req.body.country ?? user.country;
+        user.state = req.body.state ?? user.state;
+        user.city = req.body.city ?? user.city;
+
+        user.creatorVerification.stageName =
+            req.body.stageName ??
+            user.creatorVerification.stageName;
+
+        user.creatorVerification.socialLinks =
+            req.body.socialLinks ??
+            user.creatorVerification.socialLinks;
 
         await user.save();
 
+        const updatedUser = await User.findById(user._id)
+            .select("-password");
+
         res.json({
             success: true,
-            user
+            user: updatedUser
         });
 
     } catch (error) {
@@ -102,7 +125,6 @@ exports.updateProfile = async (req, res) => {
 
     }
 };
-
 exports.getAnalytics = async (req, res) => {
     try {
 

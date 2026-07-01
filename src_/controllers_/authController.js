@@ -392,3 +392,45 @@ exports.submitCreatorVerification = async (req, res) => {
 
 };
 
+exports.updateProfile = async (req, res) => {
+    try {
+
+        const user = await User.findById(req.user._id);
+
+        if (!user) {
+            return res.status(404).json({
+                error: "User not found"
+            });
+        }
+
+        user.name = req.body.name;
+        user.phoneNumber = req.body.phoneNumber;
+        user.bio = req.body.bio;
+        user.country = req.body.country;
+        user.state = req.body.state;
+        user.city = req.body.city;
+
+        user.creatorVerification.stageName =
+            req.body.stageName;
+
+        user.creatorVerification.socialLinks =
+            req.body.socialLinks;
+
+        await user.save();
+
+        const updatedUser = await User.findById(user._id)
+            .select("-password");
+
+        res.json({
+            success: true,
+            user: updatedUser
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            error: error.message
+        });
+
+    }
+};
