@@ -1,56 +1,94 @@
 const Collaboration = require('../models_/collaboration');
 const Content = require('../models_/content');
 
+const User = require("../models_/user");
 exports.sendCollaborationRequest = async (req, res) => {
-    try {
 
-        const { receiverId, contentId, message } = req.body;
+  try {
 
-        if (!receiverId || !contentId) {
-            return res.status(400).json({
-                error: "Receiver and content are required."
-            });
-        }
+    const {
+      receiverId,
+      message,
+    } = req.body;
 
-        if (receiverId === req.user._id.toString()) {
-            return res.status(400).json({
-                error: "You cannot collaborate with yourself."
-            });
-        }
+    if (!receiverId) {
+      return res.status(400).json({
+        error: "Receiver is required.",
+      });
+    }
 
-        const existing = await Collaboration.findOne({
-            senderId: req.user._id,
-            receiverId,
-            contentId,
-            status: "pending"
-        });
+    if (
+      receiverId === req.user._id.toString()
+    ) {
+      return res.status(400).json({
+        error: "You cannot collaborate with yourself.",
+      });
+    }
 
-        if (existing) {
-            return res.status(400).json({
-                error: "Collaboration request already exists."
-            });
-        }
+    const receiver =
+      await User.findById(receiverId);
 
-        const request = await Collaboration.create({
-            senderId: req.user._id,
-            receiverId,
-            contentId,
-            message,
-            status: "pending"
-        });
+    if (!receiver) {
+      return res.status(404).json({
+        error: "Creator not found.",
+      });
+    }
 
-        res.status(201).json({
-            success: true,
-            request
-        });
+    const exists =
+      await Collaboration.findOne({
 
-    } catch (error) {
+        senderId: req.user._id,
 
-        res.status(500).json({
-            error: error.message
-        });
+        receiverId,
+
+        status: "pending",
+
+      });
+
+    if (exists) {
+
+      return res.status(400).json({
+
+        error:
+          "You already have a pending request.",
+
+      });
 
     }
+
+    const collaboration =
+      await Collaboration.create({
+
+        senderId: req.user._id,
+
+        receiverId,
+
+        message,
+
+        status: "pending",
+
+      });
+
+    res.status(201).json({
+
+      success: true,
+
+      collaboration,
+
+    });
+
+  }
+
+  catch (error) {
+
+    res.status(500).json({
+
+      error: error.message,
+
+    });
+
+  }
+
 };
 
 exports.respondToCollaboration = async (req, res) => {
@@ -275,4 +313,33 @@ exports.cancelCollaborationRequest = async (req, res) => {
         });
 
     }
+};
+
+exports.discoverCreators = async (req, res) => {
+  try {
+
+    const creators = await User.find({
+      role: "creator",
+      _id: { $ne: req.user._id },
+    })
+    .select(
+      "name email profilePic bio creatorVerification isVerifiedCreator"
+    )
+    .sort({
+      createdAt: -1,
+    });
+
+    res.json({
+      success: true,
+      count: creators.length,
+      creators,
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      error: error.message,
+    });
+
+  }
 };

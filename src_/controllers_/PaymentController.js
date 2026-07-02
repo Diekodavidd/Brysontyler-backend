@@ -51,7 +51,7 @@ exports.createSubscription = async (req, res) => {
             order_description: "Creator Subscription",
 
             ipn_callback_url:
-                `${process.env.BACKEND_URL}/api/webhooks/nowpayments`
+                `${process.env.BACKEND_URL}/webhooks/nowpayments`
 
         };
 

@@ -67,10 +67,16 @@ exports.createLiveSession = async (req, res) => {
 exports.getLiveSessions = async (req, res) => {
     try {
 
-        const sessions = await LiveSession.find({
-            isLive: true
-        })
-        .populate("creatorId", "name");
+       const sessions = await LiveSession.find({
+    isLive: true
+})
+.populate(
+    "creatorId",
+    "name profileImage isVerifiedCreator"
+)
+.sort({
+    createdAt: -1
+});
 
         res.json({
             success: true,

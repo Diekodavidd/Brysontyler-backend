@@ -239,40 +239,37 @@ const cloudinary = require("../utils_/cloudinary");
 exports.uploadProfileImage = async (req, res) => {
     try {
 
+        console.log(req.file);
+
         if (!req.file) {
             return res.status(400).json({
                 error: "Image is required."
             });
         }
 
-        const result = await cloudinary.uploader.upload(
-            req.file.path,
-            {
-                folder: "brysontyler/profile-images"
-            }
-        );
+        const result = await cloudinary.uploader.upload(req.file.path, {
+            folder: "brysontyler/profile-images",
+        });
 
         const user = await User.findByIdAndUpdate(
             req.user._id,
             {
-                profileImage: result.secure_url
+                profileImage: result.secure_url,
             },
             {
-                new: true
+                new: true,
             }
-        );
+        ).select("-password");
 
-        res.json({
+        return res.json({
             success: true,
-            profileImage: user.profileImage
+            user,
         });
 
     } catch (error) {
-
-        res.status(500).json({
-            error: error.message
+        return res.status(500).json({
+            error: error.message,
         });
-
     }
 };
 
@@ -292,20 +289,21 @@ exports.uploadCoverImage = async (req, res) => {
             }
         );
 
-        const user = await User.findByIdAndUpdate(
-            req.user._id,
-            {
-                coverImage: result.secure_url
-            },
-            {
-                new: true
-            }
-        );
 
-        res.json({
-            success: true,
-            coverImage: user.coverImage
-        });
+     const user = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+        coverImage: result.secure_url
+    },
+    {
+        new: true
+    }
+).select("-password");
+
+res.json({
+    success: true,
+    user
+});
 
     } catch (error) {
 

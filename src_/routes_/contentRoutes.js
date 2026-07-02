@@ -1,5 +1,14 @@
-const express = require('express');
+const express = require("express");
+const multer = require("multer");
+
 const router = express.Router();
+
+const upload = multer({
+    dest: "uploads/",
+});
+
+const auth = require("../middleware_/authMiddleware");
+
 const {
     uploadContent,
     getAllContent,
@@ -7,12 +16,24 @@ const {
     getContentById,
     updateContent,
     deleteContent,
-    searchContent
+    searchContent,
 } = require("../controllers_/contentController");
-const auth = require('../middleware_/authMiddleware');
-const upload = require('multer')({ dest: 'uploads/' });
 
-router.post("/upload", auth, upload.single("file"), uploadContent);
+router.post(
+    "/upload",
+    auth,
+    upload.fields([
+        {
+            name: "video",
+            maxCount: 1,
+        },
+        {
+            name: "thumbnail",
+            maxCount: 1,
+        },
+    ]),
+    uploadContent
+);
 
 router.get("/", getAllContent);
 
@@ -25,6 +46,5 @@ router.get("/:id", getContentById);
 router.patch("/:id", auth, updateContent);
 
 router.delete("/:id", auth, deleteContent);
-
 
 module.exports = router;

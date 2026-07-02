@@ -4,8 +4,10 @@ const Membership = require("../models_/membership");
 exports.createMembership = async (req, res) => {
   try {
 
-    const { plan } = req.body;
+ console.log("BODY:", req.body);
+        console.log("PLAN:", req.body.plan);
 
+        const { plan } = req.body;
     if (!["VIP", "Elite"].includes(plan)) {
       return res.status(400).json({
         error: "Invalid membership plan.",
@@ -25,7 +27,7 @@ exports.createMembership = async (req, res) => {
       {
         price_amount: amount,
         price_currency: "usd",
-        pay_currency: "usdt",
+        // pay_currency: "usdt",
 
         order_id: orderId,
 
@@ -71,11 +73,18 @@ exports.createMembership = async (req, res) => {
 
   } catch (err) {
 
-    res.status(500).json({
-      error: err.message,
+    console.log("========== ERROR ==========");
+    console.log("STATUS:", err.response?.status);
+    console.log("DATA:", err.response?.data);
+    console.log("MESSAGE:", err.message);
+
+    return res.status(
+        err.response?.status || 500
+    ).json({
+        error: err.response?.data || err.message,
     });
 
-  }
+}
 };
 
 exports.getMembership = async (req, res) => {

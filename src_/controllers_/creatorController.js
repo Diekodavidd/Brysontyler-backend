@@ -179,3 +179,22 @@ exports.getCollaborations = async (req, res) => {
     }
 };
 
+exports.getAllCreators = async (req, res) => {
+  try {
+    const creators = await User.find({
+      role: "creator",
+    }).select(
+      "name profilePicture bio country city membership"
+    );
+
+    res.json({
+      success: true,
+      count: creators.length,
+      creators,
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: error.message,
+    });
+  }
+};

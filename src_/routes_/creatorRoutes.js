@@ -6,7 +6,8 @@ const {
     getProfile,
     updateProfile,
     getAnalytics,
-    getCollaborations
+    getCollaborations,
+    getAllCreators
 } = require("../controllers_/creatorController");
 const auth = require('../middleware_/authMiddleware');
 const role = require('../middleware_/roleMiddleware');
@@ -22,5 +23,7 @@ router.patch("/profile", auth, role(["creator"]), updateProfile);
 router.get("/analytics", auth, role(["creator"]), getAnalytics);
 
 router.get("/collaborations", auth, role(["creator"]), getCollaborations);
+
+router.get("/all", auth, getAllCreators);
 
 module.exports = router;

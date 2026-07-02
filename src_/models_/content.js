@@ -1,47 +1,117 @@
 const mongoose = require("mongoose");
 
-const ContentSchema = new mongoose.Schema(
+const ContentSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+
+  description: {
+    type: String,
+    default: "",
+  },
+
+  fileUrl: {
+    type: String,
+    required: true,
+  },
+
+  thumbnail: {
+    type: String,
+    default: "",
+  },
+
+  storageProvider:{
+    type:String,
+    default:"bunny"
+},
+
+storageKey:{
+    type:String,
+    required:true
+},
+
+  creatorId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    required: true,
+  },
+
+  taggedCreators: [
     {
-        title: {
-            type: String,
-            required: true,
-            trim: true
-        },
-
-       fileUrl: {
-    type: String,
-    required: true
-},
-
-cloudinaryId: {
-    type: String,
-    required: true
-},
-
-        creatorId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-            required: true
-        },
-
-        taggedCreators: [{
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User"
-        }],
-
-        approvedCollaborators: [{
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User"
-        }],
-
-        protection: {
-            type: Object,
-            default: {}
-        }
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
     },
+  ],
+
+  approvedCollaborators: [
     {
-        timestamps: true
-    }
-);
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+  ],
+
+  category: {
+    type: String,
+    default: "General",
+  },
+
+  tags: [
+    {
+      type: String,
+    },
+  ],
+
+  visibility: {
+    type: String,
+    enum: [
+      "free",
+      "subscribers",
+      "ppv",
+      "members_ppv",
+    ],
+    default: "free",
+  },
+
+  price: {
+    type: Number,
+    default: 0,
+  },
+
+  status: {
+    type: String,
+    enum: [
+      "draft",
+      "pending_review",
+      "approved",
+      "scheduled",
+      "published",
+      "rejected",
+    ],
+    default: "pending_review",
+  },
+
+  releaseDate: {
+    type: Date,
+  },
+
+  featured: {
+    type: Boolean,
+    default: false,
+  },
+
+  allowComments: {
+    type: Boolean,
+    default: true,
+  },
+
+  protection: {
+    type: Object,
+    default: {},
+  },
+}, {
+  timestamps: true,
+});
 
 module.exports = mongoose.model("Content", ContentSchema);

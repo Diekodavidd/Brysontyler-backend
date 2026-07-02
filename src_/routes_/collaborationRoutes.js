@@ -7,7 +7,8 @@ const {
     getMyRequests,
     getIncomingRequests,
     getCollaborationById,
-    cancelCollaborationRequest
+    cancelCollaborationRequest,
+    discoverCreators
 } = require("../controllers_/collaborationController");
 const auth = require('../middleware_/authMiddleware');
 const role = require('../middleware_/roleMiddleware');
@@ -25,5 +26,12 @@ router.get("/incoming", auth, role(["creator"]), getIncomingRequests);
 router.get("/:id", auth, role(["creator"]), getCollaborationById);
 
 router.delete("/:id", auth, role(["creator"]), cancelCollaborationRequest);
+
+router.get(
+    "/discover",
+    auth,
+    role(["creator"]),
+    discoverCreators
+);
 
 module.exports = router;
