@@ -6,18 +6,7 @@ const { v4: uuid } = require("uuid");
 const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
-const previewExtension = path.extname(
-    preview.originalname
-);
 
-const previewName =
-    `${uuid()}${previewExtension}`;
-
-const bunnyPreview =
-    await uploadToBunny(
-        preview.path,
-        previewName
-    );
 exports.uploadContent = async (req, res) => {
     try {
         const video = req.files?.video?.[0];
