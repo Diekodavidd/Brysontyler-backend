@@ -8,9 +8,13 @@ const upload = multer({
 });
 
 const auth = require("../middleware_/authMiddleware");
+const role = require("../middleware_/roleMiddleware");
 
 const {
     uploadContent,
+    uploadBrandContent,
+    getGallery,
+    watchContent,
     getAllContent,
     getMyContent,
     getContentById,
@@ -18,6 +22,10 @@ const {
     deleteContent,
     searchContent,
 } = require("../controllers_/contentController");
+
+/* =====================================================
+   CREATOR CONTENT
+===================================================== */
 
 router.post(
     "/upload",
@@ -28,6 +36,10 @@ router.post(
             maxCount: 1,
         },
         {
+            name: "preview",
+            maxCount: 1,
+        },
+        {
             name: "thumbnail",
             maxCount: 1,
         },
@@ -35,16 +47,81 @@ router.post(
     uploadContent
 );
 
-router.get("/", getAllContent);
+/* =====================================================
+   BRAND (ADMIN) CONTENT
+===================================================== */
 
-router.get("/search", searchContent);
+router.post(
+    "/upload-brand",
+    auth,
+    role(["admin"]),
+    upload.fields([
+        {
+            name: "video",
+            maxCount: 1,
+        },
+        {
+            name: "preview",
+            maxCount: 1,
+        },
+        {
+            name: "thumbnail",
+            maxCount: 1,
+        },
+    ]),
+    uploadBrandContent
+);
 
-router.get("/my-content", auth, getMyContent);
+/* =====================================================
+   GALLERY
+===================================================== */
 
-router.get("/:id", getContentById);
+router.get(
+    "/gallery",
+    getGallery
+);
 
-router.patch("/:id", auth, updateContent);
+router.get(
+    "/watch/:id",
+    auth,
+    watchContent
+);
 
-router.delete("/:id", auth, deleteContent);
+/* =====================================================
+   CONTENT
+===================================================== */
+
+router.get(
+    "/",
+    getAllContent
+);
+
+router.get(
+    "/search",
+    searchContent
+);
+
+router.get(
+    "/my-content",
+    auth,
+    getMyContent
+);
+
+router.get(
+    "/:id",
+    getContentById
+);
+
+router.patch(
+    "/:id",
+    auth,
+    updateContent
+);
+
+router.delete(
+    "/:id",
+    auth,
+    deleteContent
+);
 
 module.exports = router;

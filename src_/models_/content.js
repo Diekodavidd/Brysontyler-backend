@@ -21,7 +21,42 @@ const ContentSchema = new mongoose.Schema({
     type: String,
     default: "",
   },
+previewUrl: {
+    type: String,
+    default: "",
+},
 
+previewStorageKey: {
+    type: String,
+    default: "",
+},
+
+type: {
+    type: String,
+    enum: ["creator", "brand"],
+    default: "creator",
+},
+
+brandCollection: {
+    type: String,
+    default: "",
+},
+
+membership: {
+    type: String,
+    enum: ["free", "vip", "elite"],
+    default: "free",
+},
+
+duration: {
+    type: Number,
+    default: 0,
+},
+
+views: {
+    type: Number,
+    default: 0,
+},
   storageProvider:{
     type:String,
     default:"bunny"
