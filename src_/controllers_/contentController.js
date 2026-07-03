@@ -1,7 +1,6 @@
 const Content = require("../models_/content");
 const cloudinary = require("../utils_/cloudinary");
 const uploadToBunny = require("../utils_/bunny");
-const preview = req.files?.preview?.[0];
 const { v4: uuid } = require("uuid");
 const path = require("path");
 const fs = require("fs");
