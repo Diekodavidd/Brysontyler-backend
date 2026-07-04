@@ -423,6 +423,7 @@ exports.searchContent = async (req, res) => {
 };
 
 exports.uploadBrandContent = async (req, res) => {
+   console.log("REQ.USER:", req.user);
     try {
 
         const video = req.files?.video?.[0];
@@ -614,31 +615,21 @@ exports.uploadBrandContent = async (req, res) => {
 exports.getGallery = async (req, res) => {
     try {
 
-        const gallery = await Content.find({
-            type: "brand",
+        const videos = await Content.find({
             status: "published",
+            type: "brand",
         })
-            .sort({
-                featured: -1,
-                createdAt: -1,
-            })
-            .select(
-                "-storageKey -previewStorageKey -thumbnailCloudinaryId"
-            );
+        .sort({ createdAt: -1 });
 
-        res.status(200).json({
+        res.json({
             success: true,
-            count: gallery.length,
-            gallery,
+            videos,
         });
 
-    } catch (error) {
-
-        console.log(error);
+    } catch (err) {
 
         res.status(500).json({
-            success: false,
-            error: error.message,
+            error: err.message,
         });
 
     }
@@ -728,4 +719,52 @@ exports.watchContent = async (req, res) => {
         });
 
     }
+};
+
+exports.getBrandGallery = async (req, res) => {
+  try {
+    const videos = await Content.find({
+      type: "brand",
+    }).sort({
+      createdAt: -1,
+    });
+
+    res.json({
+      success: true,
+      videos,
+    });
+
+  } catch (err) {
+    console.error("GET BRAND GALLERY ERROR:", err);
+
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      stack: err.stack,
+    });
+  }
+};
+
+exports.deleteBrandVideo = async (req, res) => {
+  try {
+    const video = await Content.findById(req.params.id);
+
+    if (!video) {
+      return res.status(404).json({
+        error: "Video not found.",
+      });
+    }
+
+    await video.deleteOne();
+
+    res.json({
+      success: true,
+      message: "Video deleted.",
+    });
+
+  } catch (err) {
+    res.status(500).json({
+      error: err.message,
+    });
+  }
 };

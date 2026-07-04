@@ -88,26 +88,54 @@ membership: {
     // CREATOR
     // ==========================
 
-    creatorVerification: {
+   creatorApplication: {
 
-        stageName: String,
-
-        category: String,
-
-        socialLinks: [String],
-
-        verified: {
-            type: Boolean,
-            default: false
-        }
-
+    stageName: {
+        type: String,
+        default: "",
     },
 
-    isVerifiedCreator: {
-        type: Boolean,
-        default: false
+    category: {
+        type: String,
+        default: "",
     },
 
+    socialLinks: [
+        {
+            type: String,
+        },
+    ],
+
+    submittedAt: Date,
+
+},
+
+creatorApproval: {
+
+    status: {
+        type: String,
+        enum: [
+            "not_submitted",
+            "pending",
+            "approved",
+            "rejected",
+        ],
+        default: "not_submitted",
+    },
+
+    reviewedAt: Date,
+
+    reviewedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+    },
+
+    rejectionReason: {
+        type: String,
+        default: "",
+    },
+
+},
 
 
     // ==========================

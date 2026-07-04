@@ -330,8 +330,8 @@ exports.getOnboardingStatus = async (req, res) => {
 
             kycStatus: user.kyc?.status || "pending",
 
-            creatorVerified:
-                user.creatorVerification?.verified || false
+           creatorApproval:
+user.creatorApproval.status
 
         });
 
@@ -345,7 +345,7 @@ exports.getOnboardingStatus = async (req, res) => {
 
 };
 
-exports.submitCreatorVerification = async (req, res) => {
+exports.submitCreatorApplication = async (req, res) => {
 
     try {
 
@@ -357,17 +357,19 @@ exports.submitCreatorVerification = async (req, res) => {
 
         const user = await User.findById(req.user._id);
 
-        user.creatorVerification = {
+       user.creatorApplication = {
 
-            stageName,
+    stageName,
 
-            category,
+    category,
 
-            socialLinks,
+    socialLinks,
 
-            verified: false
+    submittedAt: new Date(),
 
-        };
+};
+
+user.creatorApproval.status = "pending";
 
         await user.save();
 
@@ -408,10 +410,10 @@ exports.updateProfile = async (req, res) => {
         user.state = req.body.state;
         user.city = req.body.city;
 
-        user.creatorVerification.stageName =
+user.creatorApplication.stageName =
             req.body.stageName;
 
-        user.creatorVerification.socialLinks =
+user.creatorApplication.socialLinks =
             req.body.socialLinks;
 
         await user.save();
@@ -428,6 +430,75 @@ exports.updateProfile = async (req, res) => {
 
         res.status(500).json({
             error: error.message
+        });
+
+    }
+};
+
+exports.adminLogin = async (req, res) => {
+    try {
+
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({
+                error: "Email and password are required.",
+            });
+        }
+
+        const cleanEmail = email.toLowerCase().trim();
+
+        const user = await User.findOne({
+            email: cleanEmail,
+        });
+
+        if (!user) {
+            return res.status(401).json({
+                error: "Invalid credentials.",
+            });
+        }
+
+        const isMatch = await bcrypt.compare(
+            password,
+            user.password
+        );
+
+        if (!isMatch) {
+            return res.status(401).json({
+                error: "Invalid credentials.",
+            });
+        }
+
+        if (user.role !== "admin") {
+            return res.status(403).json({
+                error: "Access denied. Admins only.",
+            });
+        }
+
+        const token = jwt.sign(
+            {
+                id: user._id,
+                role: user.role,
+            },
+            process.env.JWT_SECRET,
+            {
+                expiresIn: "7d",
+            }
+        );
+
+        const safeUser = await User.findById(user._id)
+            .select("-password");
+
+        res.json({
+            success: true,
+            token,
+            user: safeUser,
+        });
+
+    } catch (err) {
+
+        res.status(500).json({
+            error: err.message,
         });
 
     }

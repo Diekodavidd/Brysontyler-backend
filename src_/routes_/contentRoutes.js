@@ -21,6 +21,8 @@ const {
     updateContent,
     deleteContent,
     searchContent,
+    getBrandGallery,
+    deleteBrandVideo,
 } = require("../controllers_/contentController");
 
 /* =====================================================
@@ -53,7 +55,7 @@ router.post(
 
 router.post(
     "/upload-brand",
-    auth,
+ auth,
     role(["admin"]),
     upload.fields([
         {
@@ -72,6 +74,18 @@ router.post(
     uploadBrandContent
 );
 
+router.get(
+    "/brand",
+     auth,
+        role(["admin"]),
+    getBrandGallery
+);
+router.delete(
+  "/brand/:id",
+  auth,
+  role(["admin"]),
+  deleteBrandVideo
+);
 /* =====================================================
    GALLERY
 ===================================================== */

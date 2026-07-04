@@ -31,8 +31,9 @@ const {
 
     getOnboardingStatus,
 
-    submitCreatorVerification,
-    updateProfile
+    submitCreatorApplication,
+    updateProfile,
+    adminLogin
 
 } = require("../controllers_/authController");
 
@@ -55,7 +56,10 @@ router.get(
     auth,
     getMe
 );
-
+router.post(
+    "/admin/login",
+    adminLogin
+);
 router.post(
     "/complete-profile",
     auth,
@@ -85,7 +89,7 @@ router.get(
 router.post(
     "/creator-verification",
     auth,
-    submitCreatorVerification
+    submitCreatorApplication
 );
 router.patch(
     "/profile",
