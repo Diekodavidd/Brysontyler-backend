@@ -11,7 +11,7 @@ const MembershipSchema = new mongoose.Schema(
 
     plan: {
       type: String,
-      enum: ["VIP", "Elite"],
+      enum: ["VIP", "ELITE"],
       required: true,
     },
 
@@ -20,10 +20,30 @@ const MembershipSchema = new mongoose.Schema(
       required: true,
     },
 
+    currency: {
+      type: String,
+      default: "USD",
+    },
+
+    provider: {
+      type: String,
+      default: "NowPayments",
+    },
+
     status: {
       type: String,
-      enum: ["pending", "active", "expired", "cancelled"],
+      enum: [
+        "pending",
+        "active",
+        "expired",
+        "cancelled",
+      ],
       default: "pending",
+    },
+
+    paymentStatus: {
+      type: String,
+      default: "waiting",
     },
 
     paymentId: String,
@@ -32,6 +52,16 @@ const MembershipSchema = new mongoose.Schema(
       type: String,
       unique: true,
     },
+
+    invoiceUrl: String,
+
+    payAddress: String,
+
+    payCurrency: String,
+
+    payAmount: Number,
+
+    txHash: String,
 
     startDate: Date,
 

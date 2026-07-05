@@ -31,12 +31,19 @@ app.use('/coins', require('./src_/routes_/coinRoutes'));
 app.use('/models', require('./src_/routes_/modelRoutes'));
 app.use('/collaboration', require('./src_/routes_/collaborationRoutes'));
 app.use('/twitter', require('./src_/routes_/twitterRoutes'));
+app.use('/wallet', require('./src_/routes_/walletRoutes'));
 app.use('/fan', require('./src_/routes_/fanRoutes'));
 app.use(
     "/membership",
     require("./src_/routes_/membershipRoutes")
 );
 
+
+const {
+  verifyEmailConnection,
+} = require("./src_/services/emailService");
+
+verifyEmailConnection();
 // WebSocket Chat
 io.on('connection', (socket) => {
 console.log('User connected:', socket.id);

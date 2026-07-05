@@ -437,3 +437,27 @@ exports.getActivity = async (req, res) => {
     });
   }
 };
+
+exports.getSubscriptions = async (req, res) => {
+  try {
+    const subscriptions = await Subscription.find({
+      fanId: req.user._id,
+      status: "active",
+    })
+      .populate(
+        "creatorId",
+        "name username stageName profileImage coverImage subscriptionPrice bio"
+      )
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      subscriptions,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};

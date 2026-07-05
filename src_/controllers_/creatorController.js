@@ -1,5 +1,7 @@
 const Content = require('../models_/content');
 const User = require("../models_/user");
+const Subscription = require("../models_/subscription");
+
 
 
 exports.getDashboard = async (req, res) => {
@@ -180,21 +182,69 @@ exports.getCollaborations = async (req, res) => {
 };
 
 exports.getAllCreators = async (req, res) => {
-  try {
-    const creators = await User.find({
-      role: "creator",
-    }).select(
-      "name profilePicture bio country city membership"
-    );
+    try {
 
-    res.json({
-      success: true,
-      count: creators.length,
-      creators,
-    });
-  } catch (error) {
-    res.status(500).json({
-      error: error.message,
-    });
-  }
+        const creators = await User.find({
+            role: "creator",
+            "creatorApproval.status": "approved",
+        })
+
+        .select("-password")
+
+        .populate({
+            path: "contents",
+
+            match: {
+                status: "published",
+            },
+
+            options: {
+                sort: {
+                    createdAt: -1,
+                },
+            },
+        });
+
+        const creatorsWithStats = await Promise.all(
+
+            creators.map(async (creator) => {
+
+                const subscriberCount =
+                    await Subscription.countDocuments({
+                        creatorId: creator._id,
+                        status: "active",
+                    });
+
+                return {
+
+                    ...creator.toObject(),
+
+                    subscriberCount,
+
+                    contentCount:
+                        creator.contents.length,
+
+                };
+            })
+
+        );
+
+        res.json({
+
+            success: true,
+
+            count: creators.length,
+
+            creators: creatorsWithStats,
+
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            success: false,
+            message: error.message,
+        });
+
+    }
 };

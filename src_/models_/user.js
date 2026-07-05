@@ -142,11 +142,22 @@ creatorApproval: {
     // COINS
     // ==========================
 
-    coinBalance: {
+  coinBalances: {
+    gold: {
         type: Number,
-        default: 0
+        default: 0,
     },
 
+    silver: {
+        type: Number,
+        default: 0,
+    },
+
+    ruby: {
+        type: Number,
+        default: 0,
+    },
+},
 
 // ==========================
 // FAN SETTINGS
@@ -196,6 +207,11 @@ paymentMethods: [
     }
 
 ],
+
+subscriptionPrice: {
+    type: Number,
+    default: 9.99,
+},
     // ==========================
     // KYC
     // (KEEP THESE FOR OLD CONTROLLERS)
@@ -246,5 +262,25 @@ paymentMethods: [
     }
 
 });
+// =========================================
+// ENABLE VIRTUALS
+// =========================================
 
+UserSchema.set("toJSON", {
+    virtuals: true,
+});
+
+UserSchema.set("toObject", {
+    virtuals: true,
+});
+
+// =========================================
+// VIRTUAL POPULATE
+// =========================================
+
+UserSchema.virtual("contents", {
+    ref: "Content",
+    localField: "_id",
+    foreignField: "creatorId",
+});
 module.exports = mongoose.model("User", UserSchema);

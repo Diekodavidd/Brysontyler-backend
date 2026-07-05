@@ -2,6 +2,11 @@ const User = require('../models_/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { sendEmail } = require('../utils_/mailer');
+const {
+  sendWelcomeEmail,
+  notifyAdminNewUser,
+} = require("../services/emailService");
+
 
 exports.register = async (req, res) => {
 try {
@@ -40,6 +45,13 @@ if (!name || !email || !password) {
     });
 }
 await user.save();
+try {
+  await sendWelcomeEmail(user);
+
+  await notifyAdminNewUser(user);
+} catch (err) {
+  console.error("Registration email failed:", err.message);
+}
 
 const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 const safeUser = await User.findById(user._id).select("-password");
@@ -85,6 +97,9 @@ res.json({
 res.status(500).json({ error: error.message });
 }
 };
+const {
+    forgotPasswordEmail,
+} = require("../services/emailService");
 
 exports.forgotPassword = async (req, res) => {
 try {
@@ -99,18 +114,19 @@ const resetToken = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresI
 const resetLink =
 `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
 
-await sendEmail({
-to: email,
-subject: "Reset Your Password",
-html: `<p>Click to reset: <a href="${resetLink}">${resetLink}</a></p>`
-});
+await forgotPasswordEmail(
+    user,
+    resetLink
+);
 
 res.json({ success: true, message: 'Reset link sent to email' });
 } catch (error) {
 res.status(500).json({ error: error.message });
 }
 };
-
+const {
+    passwordChangedEmail,
+} = require("../services/emailService");
 exports.changePassword = async (req, res) => {
 try {
 const { currentPassword, newPassword } = req.body;
@@ -133,6 +149,8 @@ if (!isMatch) return res.status(400).json({ error: 'Current password incorrect' 
 user.password = await bcrypt.hash(newPassword, 10);
 await user.save();
 
+
+await passwordChangedEmail(user);
 res.json({ success: true, message: 'Password changed successfully' });
 } catch (error) {
 res.status(500).json({ error: error.message });
@@ -187,7 +205,9 @@ exports.getMe = async (req, res) => {
     res.json(user);
 
 };
-
+const {
+    profileCompletedEmail,
+} = require("../services/emailService");
 exports.completeProfile = async (req, res) => {
     try {
 
@@ -220,6 +240,8 @@ exports.completeProfile = async (req, res) => {
 
         await user.save();
 
+
+await profileCompletedEmail(user);
         res.json({
             success: true,
             message: "Profile completed successfully."
@@ -344,7 +366,10 @@ user.creatorApproval.status
     }
 
 };
-
+    const {
+  creatorApplicationReceived,
+  notifyAdminCreatorApplication,
+} = require("../services/emailService");
 exports.submitCreatorApplication = async (req, res) => {
 
     try {
@@ -372,6 +397,15 @@ exports.submitCreatorApplication = async (req, res) => {
 user.creatorApproval.status = "pending";
 
         await user.save();
+    
+
+try {
+  await creatorApplicationReceived(user);
+
+  await notifyAdminCreatorApplication(user);
+} catch (err) {
+  console.log(err);
+}
 
         res.json({
 

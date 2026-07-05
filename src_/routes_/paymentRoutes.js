@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createSubscription, getMyPayments, getPaymentById, cancelPayment, paymentWebhook } = require('../controllers_/PaymentController');
+const { createSubscription, getMyPayments, getPaymentById, cancelPayment, paymentWebhook, getPaymentByPaymentId, createSubscriptionPayment } = require('../controllers_/PaymentController');
 const auth = require('../middleware_/authMiddleware');
 
 router.post(
@@ -31,4 +31,15 @@ router.post(
     "/webhook",
     paymentWebhook
 );
+router.post(
+    "/subscription",
+    auth,
+    createSubscriptionPayment
+);
+router.get(
+    "/now/:paymentId",
+    auth,
+    getPaymentByPaymentId
+);
+
 module.exports = router;

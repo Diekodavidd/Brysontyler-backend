@@ -15,6 +15,7 @@ const {
     getAllCreators,
     getAllFans,
     getMemberships,
+    deleteUser,
 } = require("../controllers_/adminController");
 const auth = require('../middleware_/authMiddleware');
 const role = require('../middleware_/roleMiddleware');
@@ -87,6 +88,16 @@ router.get(
     getMemberships
 );
 
+router.delete(
+  "/users/:id",
+  (req, res, next) => {
+    console.log("DELETE ROUTE HIT:", req.params.id);
+    next();
+  },
+  auth,
+  role(["admin"]),
+  deleteUser
+);
 module.exports = router;
 
 

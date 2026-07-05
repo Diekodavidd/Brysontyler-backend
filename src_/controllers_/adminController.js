@@ -314,7 +314,9 @@ exports.publishScheduledContent = async (req, res) => {
 
     }
 };
-
+const {
+  creatorApprovedEmail,
+} = require("../services/emailService");
 exports.approveCreator = async (req, res) => {
     try {
 
@@ -345,6 +347,9 @@ console.log("CREATOR =", user.creatorApproval);
         user.creatorApproval.rejectionReason = "";
 
         await user.save();
+        
+
+await creatorApprovedEmail(user);
 
         res.json({
             success: true,
@@ -362,6 +367,10 @@ console.log("CREATOR =", user.creatorApproval);
 
     }
 };
+const {
+  creatorRejectedEmail,
+} = require("../services/emailService");
+
 
 exports.rejectCreator = async (req, res) => {
     try {
@@ -391,7 +400,10 @@ exports.rejectCreator = async (req, res) => {
             req.body.reason || "";
 
         await user.save();
-
+await creatorRejectedEmail(
+    user,
+    rejectionReason
+);
         res.json({
             success: true,
             message: "Creator rejected successfully.",
@@ -549,4 +561,24 @@ exports.getMemberships = async (req, res) => {
         });
 
     }
+};
+
+exports.deleteUser = async (req, res) => {
+    const { id } = req.params;
+
+    const user = await User.findById(id);
+
+    if (!user) {
+        return res.status(404).json({
+            success: false,
+            message: "User not found",
+        });
+    }
+
+    await User.findByIdAndDelete(id);
+
+    res.json({
+        success: true,
+        message: "User deleted successfully",
+    });
 };
