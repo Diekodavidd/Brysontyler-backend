@@ -7,6 +7,23 @@ const fs = require("fs");
 const axios = require("axios");
 
 exports.uploadContent = async (req, res) => {
+
+        console.log("=========== UPLOAD ===========");
+
+        console.log("BODY");
+        console.log(req.body);
+
+        console.log("FILES");
+        console.log(req.files);
+
+        console.log("VIDEO");
+        console.log(req.files?.video);
+
+        console.log("PREVIEW");
+        console.log(req.files?.preview);
+
+        console.log("THUMBNAIL");
+        console.log(req.files?.thumbnail);
     try {
         const video = req.files?.video?.[0];
         const preview = req.files?.preview?.[0];
@@ -135,9 +152,9 @@ exports.uploadContent = async (req, res) => {
                 duration: Number(
                     req.body.duration || 0
                 ),
+ownerType: "creator",
 
-                type:
-                    req.body.type || "creator",
+mediaType: req.body.type || "video",
 
                 brandCollection:
                     req.body.brandCollection || "",
@@ -508,7 +525,7 @@ exports.uploadBrandContent = async (req, res) => {
         /* -----------------------------
            Save Content
         ----------------------------- */
-
+console.log("TYPE RECEIVED:", req.body.type);
         const content =
             await Content.create({
 
@@ -525,7 +542,12 @@ exports.uploadBrandContent = async (req, res) => {
                 tags: req.body.tags
                     ? JSON.parse(req.body.tags)
                     : [],
-
+geoBlocking: req.body.geoBlocking
+    ? JSON.parse(req.body.geoBlocking)
+    : {
+          enabled: false,
+          blockedCountries: [],
+      },
                 visibility:
                     req.body.visibility || "free",
 
@@ -551,7 +573,9 @@ exports.uploadBrandContent = async (req, res) => {
                     req.body.duration || 0
                 ),
 
-                type: "brand",
+                ownerType: "brand",
+
+mediaType: req.body.type || "video",
 
                 brandCollection:
                     req.body.brandCollection || "Bryson Tyler Originals",

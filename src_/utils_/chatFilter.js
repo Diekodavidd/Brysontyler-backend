@@ -1,68 +1,65 @@
 const blockedWords = [
-    "whatsapp",
-    "telegram",
-    "signal",
-    "snapchat",
-    "discord",
-    "wechat",
-    "line",
-    "imo",
-    "phone number",
-    "call me",
-    "text me",
-    "message me",
-    "dm me",
-    "contact me",
-    "reach me",
+  "whatsapp",
+  "telegram",
+  "signal",
+  "wechat",
+  "snapchat",
+  "discord",
+  "imo",
+  "line",
+  "viber",
+  "skype",
+
+  "instagram",
+  "facebook",
+  "twitter",
+  "x.com",
+  "tiktok",
+
+  "call me",
+  "text me",
+  "dm me",
+  "contact me",
+  "reach me",
+
+  "gmail",
+  "hotmail",
+  "yahoo",
+  "outlook",
 ];
 
 const phoneRegex =
-/(\+?\d[\d\s\-()]{7,}\d)/gi;
+  /(\+?\d[\d\s().-]{7,}\d)/gi;
 
 const emailRegex =
-/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
 
 const urlRegex =
-/https?:\/\/\S+|www\.\S+/gi;
+  /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;
 
-const socialRegex =
-/@[a-zA-Z0-9_.]{3,30}/g;
+function containsRestrictedContent(
+  text = ""
+) {
+  const value = text.toLowerCase();
 
-function filterMessage(text) {
-    if (!text) return text;
+  phoneRegex.lastIndex = 0;
+  emailRegex.lastIndex = 0;
+  urlRegex.lastIndex = 0;
 
-    let cleaned = text;
+  if (phoneRegex.test(value))
+    return true;
 
-    cleaned = cleaned.replace(
-        phoneRegex,
-        "[Phone Number Removed]"
-    );
+  if (emailRegex.test(value))
+    return true;
 
-    cleaned = cleaned.replace(
-        emailRegex,
-        "[Email Removed]"
-    );
+  if (urlRegex.test(value))
+    return true;
 
-    cleaned = cleaned.replace(
-        urlRegex,
-        "[Link Removed]"
-    );
-
-    cleaned = cleaned.replace(
-        socialRegex,
-        "[Username Removed]"
-    );
-
-    blockedWords.forEach(word => {
-        const regex = new RegExp(word, "gi");
-
-        cleaned = cleaned.replace(
-            regex,
-            "[Blocked]"
-        );
-    });
-
-    return cleaned;
+  return blockedWords.some((word) =>
+    value.includes(word)
+  );
 }
 
-module.exports = filterMessage;
+module.exports = {
+  containsRestrictedContent,
+};

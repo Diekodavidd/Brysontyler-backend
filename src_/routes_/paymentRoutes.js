@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createSubscription, getMyPayments, getPaymentById, cancelPayment, paymentWebhook, getPaymentByPaymentId, createSubscriptionPayment } = require('../controllers_/PaymentController');
+const { createSubscription, getMyPayments, cancelPayment, paymentWebhook, getPaymentByInvoiceId, createSubscriptionPayment } = require('../controllers_/PaymentController');
 const auth = require('../middleware_/authMiddleware');
 
 router.post(
@@ -15,11 +15,7 @@ router.get(
     getMyPayments
 );
 
-router.get(
-    "/:id",
-    auth,
-    getPaymentById
-);
+
 
 router.patch(
     "/cancel/:id",
@@ -37,9 +33,8 @@ router.post(
     createSubscriptionPayment
 );
 router.get(
-    "/now/:paymentId",
+    "/invoice/:invoiceId",
     auth,
-    getPaymentByPaymentId
+    getPaymentByInvoiceId
 );
-
 module.exports = router;

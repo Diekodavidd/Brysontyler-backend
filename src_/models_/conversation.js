@@ -1,47 +1,83 @@
 const mongoose = require("mongoose");
 
 const ConversationSchema = new mongoose.Schema(
-{
+  {
     members: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "User",
-        },
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        required: true,
+      },
     ],
 
-    creatorId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
-    },
-
     fanId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
     },
 
-    lastMessage: String,
+    creatorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+
+    lastMessage: {
+      type: String,
+      default: "",
+    },
+
+    lastMessageType: {
+      type: String,
+      enum: ["text", "image", "video"],
+      default: "text",
+    },
+
+    lastSender: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
 
     lastMessageAt: Date,
 
-    lastSender: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+    unreadFan: {
+      type: Number,
+      default: 0,
     },
 
-    unreadCreator:{
-        type:Number,
-        default:0,
+    unreadCreator: {
+      type: Number,
+      default: 0,
     },
 
-    unreadFan:{
-        type:Number,
-        default:0,
-    }
+    active: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
-},
-{
-timestamps:true
-});
+/*
+Only ONE conversation
+between a fan and creator.
+*/
 
-module.exports =
-mongoose.model("Conversation", ConversationSchema);
+ConversationSchema.index(
+  {
+    fanId: 1,
+    creatorId: 1,
+  },
+  {
+    unique: true,
+  }
+);
+
+module.exports = mongoose.model(
+  "Conversation",
+  ConversationSchema
+);

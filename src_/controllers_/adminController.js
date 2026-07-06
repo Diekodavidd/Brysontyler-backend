@@ -162,31 +162,7 @@ exports.getAllContent = async (req, res) => {
     }
 };
 
-exports.getPendingContent = async (req, res) => {
-    try {
 
-        const content = await Content.find({
-            status: "pending_review",
-        })
-            .populate("creatorId", "name email profileImage")
-            .sort({
-                createdAt: -1,
-            });
-
-        res.json({
-            success: true,
-            count: content.length,
-            content,
-        });
-
-    } catch (err) {
-
-        res.status(500).json({
-            error: err.message,
-        });
-
-    }
-};
 
 exports.approveContent = async (req, res) => {
     try {
@@ -198,7 +174,12 @@ exports.approveContent = async (req, res) => {
                 error: "Content not found.",
             });
         }
-
+if (content.status !== "pending") {
+    return res.status(400).json({
+        success: false,
+        message: "Only pending content can be approved."
+    });
+}
         content.status = "scheduled";
         content.reviewedBy = req.user._id;
         content.reviewedAt = new Date();
@@ -230,7 +211,12 @@ exports.rejectContent = async (req, res) => {
                 error: "Content not found.",
             });
         }
-
+if (content.status !== "pending") {
+    return res.status(400).json({
+        success: false,
+        message: "Only pending content can be rejected."
+    });
+}
         content.status = "rejected";
         content.reviewComment = req.body.comment || "";
         content.reviewedBy = req.user._id;
@@ -251,6 +237,40 @@ exports.rejectContent = async (req, res) => {
         });
 
     }
+};
+
+exports.getPendingContent = async (req, res) => {
+
+    try {
+
+        const content = await Content.find({
+  status: {
+    $in: ["pending_review", "pending"],
+  },
+})
+        .populate(
+            "creatorId",
+            "name email profileImage creatorVerification"
+        )
+
+        .sort({
+            createdAt: -1
+        });
+
+        res.json({
+            success: true,
+            content
+        });
+
+    } catch(err){
+
+        res.status(500).json({
+            success:false,
+            error:err.message
+        });
+
+    }
+
 };
 
 exports.requestChanges = async (req, res) => {
@@ -581,4 +601,39 @@ exports.deleteUser = async (req, res) => {
         success: true,
         message: "User deleted successfully",
     });
+};
+
+exports.getReviewedContent = async (req, res) => {
+  try {
+
+    const content = await Content.find({
+      status: {
+        $in: [
+          "scheduled",
+          "published",
+          "rejected",
+          "changes_requested",
+        ],
+      },
+    })
+      .populate(
+        "creatorId",
+        "name creatorVerification profileImage"
+      )
+      .sort({
+        reviewedAt: -1,
+      });
+
+    res.json({
+      success: true,
+      content,
+    });
+
+  } catch (err) {
+
+    res.status(500).json({
+      error: err.message,
+    });
+
+  }
 };

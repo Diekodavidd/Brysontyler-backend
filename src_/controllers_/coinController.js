@@ -19,15 +19,24 @@ exports.purchaseCoins = async (req, res) => {
         }
 
         const paymentData = {
-            price_amount: amount,
-            price_currency: "usd",
-            pay_currency: "usdt",
-            order_id: `coin_${req.user._id}_${Date.now()}`,
-            ipn_callback_url: `${process.env.BACKEND_URL}/api/webhooks/nowpayments`
-        };
+    price_amount: amount,
+    price_currency: "usd",
 
+    order_id: orderId,
+
+    order_description: "...",
+
+    ipn_callback_url:
+        `${process.env.BACKEND_URL}/payments/webhook`,
+
+    success_url:
+        `${process.env.FRONTEND_URL}/payment/success`,
+
+    cancel_url:
+        `${process.env.FRONTEND_URL}/payment/cancel`,
+};
         const response = await axios.post(
-            "https://api.nowpayments.io/v1/payment",
+            "https://api.nowpayments.io/v1/invoice",
             paymentData,
             {
                 headers: {

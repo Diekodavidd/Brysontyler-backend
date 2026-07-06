@@ -1,9 +1,22 @@
-const Subscription = require("../models/Subscription");
 const User = require("../models/User");
+const Subscription = require("../models/Subscription");
 
-module.exports = async (req, res, next) => {
+module.exports = async (
+  req,
+  res,
+  next
+) => {
   try {
-    const fanId = req.user.id;
+    const sender = req.user;
+
+    /*
+    Creators can always reply.
+    */
+
+    if (sender.role === "creator") {
+      return next();
+    }
+
     const { creatorId } = req.body;
 
     if (!creatorId) {
@@ -13,7 +26,9 @@ module.exports = async (req, res, next) => {
       });
     }
 
-    const fan = await User.findById(fanId);
+    const fan = await User.findById(
+      sender.id
+    );
 
     if (!fan) {
       return res.status(404).json({
@@ -22,39 +37,57 @@ module.exports = async (req, res, next) => {
       });
     }
 
-    // Membership must be VIP or Elite
-    if (!["VIP", "Elite"].includes(fan.membership.plan)) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Upgrade to VIP or Elite to message creators.",
-      });
-    }
+    /*
+    Membership check
+    */
 
-    // Membership must still be active
     if (
-      fan.membership.endDate &&
-      fan.membership.endDate < new Date()
+      !["VIP", "Elite"].includes(
+        fan.membership.plan
+      )
     ) {
       return res.status(403).json({
         success: false,
-        message: "Your membership has expired.",
+        message:
+          "Upgrade to VIP to message creators.",
       });
     }
 
-    // Must have an active subscription
-    const subscription = await Subscription.findOne({
-      fanId,
-      creatorId,
-      status: "active",
-      endDate: { $gt: new Date() },
-    });
+    /*
+    Membership expiry
+    */
+
+    if (
+      fan.membership.endDate &&
+      fan.membership.endDate <
+        new Date()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Membership has expired.",
+      });
+    }
+
+    /*
+    Active subscription
+    */
+
+    const subscription =
+      await Subscription.findOne({
+        fanId: sender.id,
+        creatorId,
+        status: "active",
+        endDate: {
+          $gt: new Date(),
+        },
+      });
 
     if (!subscription) {
       return res.status(403).json({
         success: false,
         message:
-          "Subscribe to this creator before sending messages.",
+          "Subscribe to this creator first.",
       });
     }
 
@@ -64,7 +97,8 @@ module.exports = async (req, res, next) => {
 
     res.status(500).json({
       success: false,
-      message: "Permission check failed.",
+      message:
+        "Permission check failed.",
     });
   }
 };

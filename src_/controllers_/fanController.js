@@ -1,6 +1,8 @@
+
 const User = require("../models_/user");
 const Subscription = require("../models_/subscription");
 const Payment = require("../models_/payment");
+const content = require("../models_/content");
 
 
 // ==============================
@@ -87,7 +89,40 @@ exports.getProfile = async (req, res) => {
 };
 
 
+exports.getCreatorById = async (req, res) => {
 
+    try {
+        const { id } = req.params;
+
+       const creator = await User.findById(id);
+
+if (!creator) {
+    return res.status(404).json({
+        success: false,
+        message: "Creator not found",
+    });
+}
+
+const contents = await content.find({
+    creatorId: id,
+    status: "published",
+})
+.sort({ createdAt: -1 });
+
+res.json({
+    success: true,
+    creator: {
+        ...creator.toObject(),
+        contents,
+    },
+});
+    } catch (err) {
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+    }
+};
 // ==============================
 // Update Profile
 // ==============================

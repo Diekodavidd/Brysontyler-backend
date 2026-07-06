@@ -13,14 +13,28 @@ const PaymentSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
-completed: {
-  type: Boolean,
-  default: false,
-},
+
     membershipPlan: {
       type: String,
       enum: ["VIP", "ELITE"],
       default: null,
+    },
+
+    paymentType: {
+      type: String,
+      enum: [
+        "membership",
+        "wallet",
+        "coins",
+        "subscription",
+        "tip",
+      ],
+      required: true,
+    },
+
+    completed: {
+      type: Boolean,
+      default: false,
     },
 
     amount: {
@@ -35,87 +49,65 @@ completed: {
 
     paymentProvider: {
       type: String,
-      default: "NowPayments",
-    },
-
-    // NOWPayments IDs
-    paymentId: {
-      type: String,
-      unique: true,
+      default: "NOWPayments",
     },
 
     orderId: {
       type: String,
-      required: true,
       unique: true,
+      required: true,
     },
+
+    invoiceId: String,
+
+    invoiceUrl: String,
 
     paymentStatus: {
       type: String,
       default: "waiting",
     },
 
-   paymentType: {
-  type: String,
-  enum: [
-    "membership",
-    "wallet",
-    "coins",
-    "subscription",
-    "tip",
-  ],
-  required: true,
-},
+    walletAmount: {
+      type: Number,
+      default: 0,
+    },
 
-walletAmount: {
-  type: Number,
-  default: 0,
-},
-
-coinPurchase: {
-    coinType: {
+    coinPurchase: {
+      coinType: {
         type: String,
         enum: [
-            "gold",
-            "silver",
-            "ruby",
+          "gold",
+          "silver",
+          "ruby",
         ],
-    },
+      },
 
-    quantity: {
+      quantity: {
         type: Number,
         default: 0,
+      },
+
+      pricePerCoin: Number,
     },
-
-    pricePerCoin: Number,
+paymentId: {
+    type: String,
+    default: null,
 },
-
-    // Payment Details
-    payAddress: String,
-
-    payAmount: Number,
-
-    payCurrency: String,
-
-    network: String,
-
-    validUntil: Date,
-
-    orderDescription: String,
-
     amountReceived: {
       type: Number,
       default: 0,
     },
-txHash: String,
-    actuallyPaid: {
-      type: Number,
-      default: 0,
-    },
+
+    txHash: String,
+
+    orderDescription: String,
   },
   {
     timestamps: true,
   }
 );
 
-module.exports = mongoose.model("Payment", PaymentSchema);
+module.exports = mongoose.model(
+  "Payment",
+  PaymentSchema
+);

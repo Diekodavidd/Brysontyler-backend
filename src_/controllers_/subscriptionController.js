@@ -306,46 +306,85 @@ exports.checkSubscription = async (req, res) => {
     }
 };
 
-exports.getCreatorSubscribers = async (req,res)=>{
+exports.getCreatorSubscribers = async (req, res) => {
+  try {
 
-    try{
+    console.log("LOGGED IN USER");
+    console.log(req.user);
 
-        const subscribers = await Subscription.find({
+    const creator = await User.findById(req.user._id);
 
-            creatorId:req.user._id,
+    console.log("CREATOR");
+    console.log(creator);
 
-            status:"active"
+    console.log("Collection:", Subscription.collection.name);
 
-        })
+const all = await Subscription.find();
 
-        .populate("fanId","name email")
+console.log("ALL SUBSCRIPTIONS");
+console.log(all);
 
-        .sort({
 
-            createdAt:-1
+const subscribers = await Subscription.find({
+    creatorId: req.user.id,
+})
+.populate("fanId", "name email profileImage")
+console.log("MATCHED");
+console.log(subscribers);
 
-        });
+    console.log("FOUND SUBSCRIBERS");
+    console.log(subscribers);
 
-        res.json({
+    return res.json({
+      success: true,
+      subscriptionPrice: creator.subscriptionPrice,
+      subscribers,
+    });
 
-            success:true,
+  } catch (err) {
+    console.log(err);
 
-            count:subscribers.length,
+    res.status(500).json({
+      success:false,
+      message:err.message
+    });
+  }
+};
 
-            subscribers
+exports.updateSubscriptionPrice = async (req, res) => {
+  console.log("===== UPDATE PRICE HIT =====");
+  console.log(req.body);
+  console.log(req.user);
 
-        });
+  try {
+    const { price } = req.body;
 
+    if (!price || Number(price) <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid subscription price is required.",
+      });
     }
 
-    catch(error){
+    const creator = await User.findByIdAndUpdate(
+      req.user._id,
+      {
+        subscriptionPrice: Number(price),
+      },
+      {
+        new: true,
+      }
+    );
 
-        res.status(500).json({
-
-            error:error.message
-
-        });
-
-    }
-
+    return res.json({
+      success: true,
+      message: "Subscription price updated.",
+      subscriptionPrice: creator.subscriptionPrice,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
 };

@@ -1,42 +1,35 @@
 const mongoose = require("mongoose");
 
-const UserSchema = new mongoose.Schema({
-
+const UserSchema = new mongoose.Schema(
+  {
     // ==========================
     // BASIC ACCOUNT
     // ==========================
 
     name: {
-        type: String,
-        required: true,
-        trim: true
+      type: String,
+      required: true,
+      trim: true,
     },
 
     email: {
-        type: String,
-        required: true,
-        unique: true,
-        lowercase: true,
-        trim: true
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
     },
 
     password: {
-        type: String,
-        required: true
+      type: String,
+      required: true,
     },
 
     role: {
-        type: String,
-        enum: ["fan", "creator", "admin"],
-        default: "fan"
+      type: String,
+      enum: ["fan", "creator", "admin"],
+      default: "fan",
     },
-
-    createdAt: {
-        type: Date,
-        default: Date.now
-    },
-
-
 
     // ==========================
     // PROFILE
@@ -61,217 +54,225 @@ const UserSchema = new mongoose.Schema({
     coverImage: String,
 
     profileCompleted: {
-        type: Boolean,
-        default: false
+      type: Boolean,
+      default: false,
     },
 
+    // ==========================
+    // MEMBERSHIP
+    // ==========================
 
-membership: {
-
-    plan: {
+    membership: {
+      plan: {
         type: String,
-        enum: ["FREE", "VIP", "Elite"],
-        default: "FREE"
-    },
+        enum: ["FREE", "VIP", "ELITE"],
+        default: "FREE",
+      },
 
-    status: {
+      status: {
         type: String,
-        default: "active"
+        enum: [
+          "inactive",
+          "pending",
+          "active",
+          "expired",
+          "cancelled",
+        ],
+        default: "inactive",
+      },
+
+      startDate: Date,
+
+      endDate: Date,
     },
 
-    startDate: Date,
-
-    endDate: Date
-
-},
     // ==========================
     // CREATOR
     // ==========================
 
-   creatorApplication: {
-
-    stageName: {
+    creatorApplication: {
+      stageName: {
         type: String,
         default: "",
-    },
+      },
 
-    category: {
+      category: {
         type: String,
         default: "",
-    },
+      },
 
-    socialLinks: [
+      socialLinks: [
         {
-            type: String,
+          type: String,
         },
-    ],
+      ],
 
-    submittedAt: Date,
+      submittedAt: Date,
+    },
 
-},
-
-creatorApproval: {
-
-    status: {
+    creatorApproval: {
+      status: {
         type: String,
         enum: [
-            "not_submitted",
-            "pending",
-            "approved",
-            "rejected",
+          "not_submitted",
+          "pending",
+          "approved",
+          "rejected",
         ],
         default: "not_submitted",
-    },
+      },
 
-    reviewedAt: Date,
+      reviewedAt: Date,
 
-    reviewedBy: {
+      reviewedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-    },
+      },
 
-    rejectionReason: {
+      rejectionReason: {
         type: String,
         default: "",
+      },
     },
-
-},
-
 
     // ==========================
-    // COINS
+    // CREATOR SETTINGS
     // ==========================
 
-  coinBalances: {
-    gold: {
+    subscriptionPrice: {
+      type: Number,
+      default: 19.99,
+    },
+
+    // ==========================
+    // WALLET
+    // ==========================
+
+    walletBalance: {
+      type: Number,
+      default: 0,
+    },
+
+    coinBalances: {
+      gold: {
         type: Number,
         default: 0,
-    },
+      },
 
-    silver: {
+      silver: {
         type: Number,
         default: 0,
-    },
+      },
 
-    ruby: {
+      ruby: {
         type: Number,
         default: 0,
-    },
-},
-
-// ==========================
-// FAN SETTINGS
-// ==========================
-
-preferences: {
-
-    darkMode: {
-        type: Boolean,
-        default: true
+      },
     },
 
-    autoplay: {
+    // ==========================
+    // FAN SETTINGS
+    // ==========================
+
+    preferences: {
+      darkMode: {
         type: Boolean,
-        default: true
+        default: true,
+      },
+
+      autoplay: {
+        type: Boolean,
+        default: true,
+      },
+
+      emailNotifications: {
+        type: Boolean,
+        default: true,
+      },
+
+      pushNotifications: {
+        type: Boolean,
+        default: true,
+      },
     },
 
-    emailNotifications: {
-        type: Boolean,
-        default: true
-    },
+    // ==========================
+    // PAYMENT METHODS
+    // ==========================
 
-    pushNotifications: {
-        type: Boolean,
-        default: true
-    }
-
-},
-
-paymentMethods: [
-
-    {
-
+    paymentMethods: [
+      {
         provider: String,
 
         accountName: String,
 
         accountNumber: String,
 
-        walletAddress: String,
-
         isDefault: {
-            type: Boolean,
-            default: false
-        }
+          type: Boolean,
+          default: false,
+        },
+      },
+    ],
 
-    }
-
-],
-
-subscriptionPrice: {
-    type: Number,
-    default: 9.99,
-},
     // ==========================
-    // KYC
-    // (KEEP THESE FOR OLD CONTROLLERS)
+    // LEGACY KYC
     // ==========================
 
     isKYCVerified: {
-        type: Boolean,
-        default: false
+      type: Boolean,
+      default: false,
     },
 
     kycStatus: {
-        type: String,
-        enum: [
-            "not_started",
-            "pending",
-            "approved",
-            "rejected"
-        ],
-        default: "not_started"
+      type: String,
+      enum: [
+        "not_started",
+        "pending",
+        "approved",
+        "rejected",
+      ],
+      default: "not_started",
     },
 
     kycVerifiedAt: Date,
 
-
-
     // ==========================
     // DIDIT
-    // (NEW)
     // ==========================
 
     didit: {
+      workflowId: String,
 
-        workflowId: String,
+      sessionId: String,
 
-        sessionId: String,
+      sessionToken: String,
 
-        sessionToken: String,
+      verificationUrl: String,
 
-        verificationUrl: String,
+      status: {
+        type: String,
+        default: "not_started",
+      },
 
-        status: {
-            type: String,
-            default: "not_started"
-        },
+      verifiedAt: Date,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
-        verifiedAt: Date
-
-    }
-
-});
 // =========================================
 // ENABLE VIRTUALS
 // =========================================
 
 UserSchema.set("toJSON", {
-    virtuals: true,
+  virtuals: true,
 });
 
 UserSchema.set("toObject", {
-    virtuals: true,
+  virtuals: true,
 });
 
 // =========================================
@@ -279,8 +280,9 @@ UserSchema.set("toObject", {
 // =========================================
 
 UserSchema.virtual("contents", {
-    ref: "Content",
-    localField: "_id",
-    foreignField: "creatorId",
+  ref: "Content",
+  localField: "_id",
+  foreignField: "creatorId",
 });
+
 module.exports = mongoose.model("User", UserSchema);

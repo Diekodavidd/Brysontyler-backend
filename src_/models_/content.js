@@ -30,11 +30,26 @@ previewStorageKey: {
     type: String,
     default: "",
 },
+geoBlocking: {
+    enabled: {
+        type: Boolean,
+        default: false,
+    },
 
-type: {
+    blockedCountries: [{
+        type: String,
+    }],
+},
+ownerType: {
     type: String,
     enum: ["creator", "brand"],
     default: "creator",
+},
+
+mediaType: {
+    type: String,
+    enum: ["video", "image"],
+    default: "video",
 },
 
 brandCollection: {

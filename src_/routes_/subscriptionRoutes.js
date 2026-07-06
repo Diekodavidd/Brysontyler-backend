@@ -11,7 +11,8 @@ const {
     cancelSubscription,
     renewSubscription,
     getCreatorSubscribers,
-    checkSubscription
+    checkSubscription,
+    updateSubscriptionPrice
 } = require("../controllers_/subscriptionController");
 
 router.post("/", auth, subscribeToCreator);
@@ -28,4 +29,9 @@ router.get("/creator/subscribers", auth, getCreatorSubscribers);
 
 router.get("/check/:creatorId", auth, checkSubscription);
 
+router.put(
+  "/creator/subscription-price",
+  auth,
+  updateSubscriptionPrice
+);
 module.exports = router;

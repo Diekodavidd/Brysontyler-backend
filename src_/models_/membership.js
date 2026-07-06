@@ -27,7 +27,7 @@ const MembershipSchema = new mongoose.Schema(
 
     provider: {
       type: String,
-      default: "NowPayments",
+      default: "NOWPayments",
     },
 
     status: {
@@ -46,22 +46,18 @@ const MembershipSchema = new mongoose.Schema(
       default: "waiting",
     },
 
-    paymentId: String,
-
     orderId: {
       type: String,
       unique: true,
     },
 
-    invoiceUrl: String,
+    invoiceId: {
+      type: String,
+    },
 
-    payAddress: String,
-
-    payCurrency: String,
-
-    payAmount: Number,
-
-    txHash: String,
+    invoiceUrl: {
+      type: String,
+    },
 
     startDate: Date,
 

@@ -5,9 +5,7 @@ const auth = require("../middleware_/authMiddleware");
 
 const {
     createMembership,
-    getMembership,
-    membershipWebhook,
-} = require("../controllers_/membershipController");
+    getMembership,} = require("../controllers_/membershipController");
 
 router.post(
     "/create",
@@ -21,10 +19,7 @@ router.get(
     getMembership
 );
 
-router.post(
-    "/webhook",
-    membershipWebhook
-);
+
 
 
 

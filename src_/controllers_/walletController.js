@@ -19,14 +19,20 @@ exports.depositToWallet = async (req, res) => {
     const paymentData = {
       price_amount: Number(amount),
       price_currency: "usd",
-      pay_currency: "usdttrc20",
+
       order_id: orderId,
-      order_description: `Wallet Deposit`,
+
+      order_description: "Wallet Deposit",
+
       ipn_callback_url: `${process.env.BACKEND_URL}/payments/webhook`,
+
+      success_url: `${process.env.FRONTEND_URL}/payment/success`,
+
+      cancel_url: `${process.env.FRONTEND_URL}/payment/cancel`,
     };
 
     const { data } = await axios.post(
-      "https://api.nowpayments.io/v1/payment",
+      "https://api.nowpayments.io/v1/invoice",
       paymentData,
       {
         headers: {
@@ -42,21 +48,22 @@ exports.depositToWallet = async (req, res) => {
       paymentType: "wallet",
 
       amount: Number(amount),
+
       walletAmount: Number(amount),
 
       currency: "USD",
-      paymentProvider: "NowPayments",
 
-      paymentId: data.payment_id,
+      paymentProvider: "NOWPayments",
+
       orderId,
 
-      paymentStatus: data.payment_status || "waiting",
+      invoiceId: data.id,
 
-      payAddress: data.pay_address,
-      payAmount: data.pay_amount,
-      payCurrency: data.pay_currency,
-      network: data.network,
-      validUntil: data.valid_until,
+      invoiceUrl: data.invoice_url,
+
+      paymentStatus: "waiting",
+
+      orderDescription: "Wallet Deposit",
     });
 
     return res.json({
@@ -72,10 +79,6 @@ exports.depositToWallet = async (req, res) => {
     });
   }
 };
-
-
-
-
 
 
 exports.buyCoins = async (req, res) => {
@@ -111,14 +114,20 @@ exports.buyCoins = async (req, res) => {
     const paymentData = {
       price_amount: amount,
       price_currency: "usd",
-      pay_currency: "usdttrc20",
+
       order_id: orderId,
+
       order_description: `${quantity} ${coinType} coins`,
+
       ipn_callback_url: `${process.env.BACKEND_URL}/payments/webhook`,
+
+      success_url: `${process.env.FRONTEND_URL}/payment/success`,
+
+      cancel_url: `${process.env.FRONTEND_URL}/payment/cancel`,
     };
 
     const { data } = await axios.post(
-      "https://api.nowpayments.io/v1/payment",
+      "https://api.nowpayments.io/v1/invoice",
       paymentData,
       {
         headers: {
@@ -133,27 +142,27 @@ exports.buyCoins = async (req, res) => {
 
       paymentType: "coins",
 
+      amount,
+
+      currency: "USD",
+
+      paymentProvider: "NOWPayments",
+
+      orderId,
+
+      invoiceId: data.id,
+
+      invoiceUrl: data.invoice_url,
+
+      paymentStatus: "waiting",
+
+      orderDescription: `${quantity} ${coinType} coins`,
+
       coinPurchase: {
         coinType,
         quantity: Number(quantity),
         pricePerCoin,
       },
-
-      amount,
-
-      currency: "USD",
-      paymentProvider: "NowPayments",
-
-      paymentId: data.payment_id,
-      orderId,
-
-      paymentStatus: data.payment_status || "waiting",
-
-      payAddress: data.pay_address,
-      payAmount: data.pay_amount,
-      payCurrency: data.pay_currency,
-      network: data.network,
-      validUntil: data.valid_until,
     });
 
     return res.json({
@@ -173,7 +182,7 @@ exports.buyCoins = async (req, res) => {
 exports.getWallet = async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select(
-      "coinBalance wallet membership"
+      "walletBalance coinBalances membership"
     );
 
     const payments = await Payment.find({
@@ -185,8 +194,8 @@ exports.getWallet = async (req, res) => {
     res.json({
       success: true,
       wallet: {
-        balance: user.wallet?.balance || 0,
-        coinBalance: user.coinBalance || 0,
+        balance: user.walletBalance || 0,
+        coinBalances: user.coinBalances,
         membership: user.membership,
         payments,
       },

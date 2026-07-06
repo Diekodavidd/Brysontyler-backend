@@ -1,54 +1,70 @@
 const mongoose = require("mongoose");
 
 const MessageSchema = new mongoose.Schema(
-{
+  {
+    conversationId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Conversation",
+      required: true,
+      index: true,
+    },
 
-conversationId:{
-type:mongoose.Schema.Types.ObjectId,
-ref:"Conversation",
-required:true
-},
+    sender: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
 
-sender:{
-type:mongoose.Schema.Types.ObjectId,
-ref:"User",
-required:true
-},
+    receiver: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
 
-receiver:{
-type:mongoose.Schema.Types.ObjectId,
-ref:"User",
-required:true
-},
+    messageType: {
+      type: String,
+      enum: [
+        "text",
+        "image",
+        "video",
+      ],
+      default: "text",
+    },
 
-text:String,
+    text: {
+      type: String,
+      trim: true,
+      default: "",
+    },
 
-attachments:[
-{
-url:String,
-type:String
-}
-],
+    attachment: {
+      url: String,
+      publicId: String,
+      mimeType: String,
+      size: Number,
+    },
 
-read:{
-type:Boolean,
-default:false
-},
+    read: {
+      type: Boolean,
+      default: false,
+    },
 
-edited:{
-type:Boolean,
-default:false
-},
+    edited: {
+      type: Boolean,
+      default: false,
+    },
 
-deleted:{
-type:Boolean,
-default:false
-}
+    deleted: {
+      type: Boolean,
+      default: false,
+    },
+  },
+  {
+    timestamps: true,
+  }
+);
 
-},
-{
-timestamps:true
-});
-
-module.exports =
-mongoose.model("Message",MessageSchema);
+module.exports = mongoose.model(
+  "Message",
+  MessageSchema
+);

@@ -58,7 +58,7 @@ exports.createSubscription = async (req, res) => {
 console.log(paymentData);
         const response = await axios.post(
 
-            "https://api.nowpayments.io/v1/payment",
+            "https://api.nowpayments.io/v1/invoice",
 
             paymentData,
 
@@ -253,8 +253,10 @@ exports.cancelPayment = async (req, res) => {
 };
 
 
-exports.createSubscriptionPayment = async (req, res) => {
-     console.log("SUBSCRIPTION CONTROLLER RUNNING");
+exports.createSubscriptionPayment = async (
+  req,
+  res
+) => {
   try {
     const { creatorId } = req.body;
 
@@ -265,43 +267,60 @@ exports.createSubscriptionPayment = async (req, res) => {
       });
     }
 
-    const creator = await User.findById(creatorId);
+    const creator = await User.findById(
+      creatorId
+    );
 
-    if (!creator || creator.role !== "creator") {
+    if (
+      !creator ||
+      creator.role !== "creator"
+    ) {
       return res.status(404).json({
         success: false,
         message: "Creator not found.",
       });
     }
 
-    const amount = creator.subscriptionPrice || 9.99;
+    const amount =
+      creator.subscriptionPrice || 9.99;
 
     const orderId = `subscription_${req.user._id}_${creator._id}_${Date.now()}`;
 
     const paymentData = {
       price_amount: amount,
       price_currency: "usd",
-      pay_currency: "usdttrc20",
+
       order_id: orderId,
+
       order_description: `Subscription to ${
-        creator.stageName || creator.name
+        creator.stageName ||
+        creator.name
       }`,
+
       ipn_callback_url: `${process.env.BACKEND_URL}/payments/webhook`,
+
+      success_url: `${process.env.FRONTEND_URL}/payment/success`,
+
+      cancel_url: `${process.env.FRONTEND_URL}/payment/cancel`,
     };
 
     const { data } = await axios.post(
-      "https://api.nowpayments.io/v1/payment",
+      "https://api.nowpayments.io/v1/invoice",
       paymentData,
       {
         headers: {
-          "x-api-key": process.env.NOWPAYMENTS_API_KEY,
-          "Content-Type": "application/json",
+          "x-api-key":
+            process.env
+              .NOWPAYMENTS_API_KEY,
+          "Content-Type":
+            "application/json",
         },
       }
     );
 
     await Payment.create({
       userId: req.user._id,
+
       creatorId: creator._id,
 
       paymentType: "subscription",
@@ -309,244 +328,211 @@ exports.createSubscriptionPayment = async (req, res) => {
       amount,
 
       currency: "USD",
-      paymentProvider: "NowPayments",
 
-      paymentId: data.payment_id,
+      paymentProvider:
+        "NOWPayments",
+
       orderId,
 
-      paymentStatus: data.payment_status || "waiting",
+      invoiceId: data.id,
 
-      payAddress: data.pay_address,
-      payAmount: data.pay_amount,
-      payCurrency: data.pay_currency,
-      network: data.network,
-      validUntil: data.valid_until,
+      invoiceUrl: data.invoice_url,
+
+      paymentStatus: "waiting",
+
+      orderDescription:
+        paymentData.order_description,
     });
 
-    return res.json({
+    res.json({
       success: true,
       payment: data,
     });
   } catch (err) {
-    console.log(err.response?.data || err);
+    console.log(
+      err.response?.data || err
+    );
 
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
-      error: err.response?.data || err.message,
+      error:
+        err.response?.data ||
+        err.message,
     });
   }
 };
 
-exports.paymentWebhook = async (req, res) => {
+exports.paymentWebhook = async (
+  req,
+  res
+) => {
   try {
     const {
       order_id,
       payment_status,
-      payment_id,
       actually_paid,
-      pay_amount,
-      outcome_amount,
+      purchase_id,
     } = req.body;
 
-    const payment = await Payment.findOne({
-      orderId: order_id,
-    });
+    const payment =
+      await Payment.findOne({
+        orderId: order_id,
+      });
 
-    if (!payment) {
+    if (!payment)
       return res.sendStatus(404);
-    }
 
-    // Update payment details
-    payment.paymentStatus = payment_status;
-    payment.paymentId = payment_id || payment.paymentId;
-    payment.amountReceived = actually_paid || pay_amount || 0;
-    payment.actuallyPaid =
-      outcome_amount || actually_paid || 0;
+    payment.paymentStatus =
+      payment_status;
+
+    payment.amountReceived =
+      actually_paid || 0;
+
+    payment.txHash =
+      purchase_id || "";
 
     await payment.save();
 
-    const successfulStatuses = [
-      "confirmed",
-      "finished",
-      "sending",
-      "partially_paid",
-    ];
-
     if (
-      successfulStatuses.includes(payment_status) &&
-      !payment.completed
+      payment.completed ||
+      payment_status !== "finished"
     ) {
-      payment.completed = true;
+      return res.sendStatus(200);
+    }
 
-      const user = await User.findById(payment.userId);
+    payment.completed = true;
 
-      if (!user) {
-        return res.sendStatus(404);
-      }
+    const user = await User.findById(
+      payment.userId
+    );
 
-      switch (payment.paymentType) {
-        // ===========================================
-        // Wallet Deposit
-        // ===========================================
-        case "wallet":
-          user.walletBalance =
-            (user.walletBalance || 0) +
-            payment.walletAmount;
-          break;
+    switch (payment.paymentType) {
+      case "wallet":
+        user.walletBalance +=
+          payment.walletAmount;
+        break;
 
-        // ===========================================
-        // Coin Purchase
-        // ===========================================
-        case "coins":
-          if (
-            payment.coinPurchase?.coinType &&
-            payment.coinPurchase?.quantity
-          ) {
-            user.coinBalances[
-              payment.coinPurchase.coinType
-            ] =
-              (user.coinBalances[
-                payment.coinPurchase.coinType
-              ] || 0) +
-              payment.coinPurchase.quantity;
-          }
-          break;
+      case "coins":
+        user.coinBalances[
+          payment.coinPurchase.coinType
+        ] +=
+          payment.coinPurchase.quantity;
+        break;
 
-        // ===========================================
-        // Membership Upgrade
-        // ===========================================
-        case "membership":
-          user.membership.plan =
-            payment.membershipPlan;
+      case "membership":
+        user.membership = {
+          plan: payment.membershipPlan,
+          status: "active",
+          startDate: new Date(),
+          endDate: new Date(
+            Date.now() +
+              30 *
+                24 *
+                60 *
+                60 *
+                1000
+          ),
+        };
+        break;
 
-          user.membership.status = "active";
+      case "subscription": {
+        let sub =
+          await subscription.findOne({
+            fanId: payment.userId,
+            creatorId:
+              payment.creatorId,
+          });
 
-          user.membership.startDate =
-            new Date();
+        if (sub) {
+          sub.status = "active";
 
-          user.membership.endDate =
-            new Date(
+          sub.amount = payment.amount;
+
+          sub.startDate = new Date();
+
+          sub.endDate = new Date(
+            Date.now() +
+              30 *
+                24 *
+                60 *
+                60 *
+                1000
+          );
+
+          await sub.save();
+        } else {
+          await subscription.create({
+            fanId: payment.userId,
+
+            creatorId:
+              payment.creatorId,
+
+            amount: payment.amount,
+
+            status: "active",
+
+            startDate: new Date(),
+
+            endDate: new Date(
               Date.now() +
-                30 * 24 * 60 * 60 * 1000
-            );
-            
-
-          break;
-
-        // ===========================================
-        // Creator Subscription
-        // ===========================================
-        case "subscription": {
-          let existing =
-            await subscription.findOne({
-              fanId: payment.userId,
-              creatorId: payment.creatorId,
-            });
-
-          if (existing) {
-            existing.status = "active";
-            existing.amount = payment.amount;
-            existing.startDate = new Date();
-            existing.endDate = new Date(
-              Date.now() +
-                30 * 24 * 60 * 60 * 1000
-            );
-
-            await existing.save();
-          } else {
-            await subscription.create({
-              fanId: payment.userId,
-              creatorId: payment.creatorId,
-              amount: payment.amount,
-              status: "active",
-              startDate: new Date(),
-              endDate: new Date(
-                Date.now() +
-                  30 * 24 * 60 * 60 * 1000
-              ),
-            });
-          }
-
-          break;
+                30 *
+                  24 *
+                  60 *
+                  60 *
+                  1000
+            ),
+          });
         }
 
-        // ===========================================
-        // Tips
-        // ===========================================
-        case "tip":
-          // We'll credit creator earnings later.
-          break;
-
-        default:
-          break;
+        break;
       }
 
-      await user.save();
-      await payment.save();
+      default:
+        break;
     }
+
+    await user.save();
+
+    await payment.save();
 
     return res.sendStatus(200);
   } catch (err) {
-  console.error(err);
+    console.error(err);
 
-  console.dir(err.errorResponse?.errInfo, {
-    depth: null,
-  });
-
-  return res.sendStatus(500);
-}
+    return res.sendStatus(500);
+  }
 };
 
-exports.getPaymentByPaymentId = async (req, res) => {
+exports.getPaymentByInvoiceId = async (req, res) => {
+  try {
+    console.log(req.params); // should print { invoiceId: "6343611112" }
 
-    try {
+    const payment = await Payment.findOne({
+      invoiceId: req.params.invoiceId,
+    });
 
-        const payment = await Payment.findOne({
-
-            paymentId: req.params.paymentId,
-
-        });
-
-        if (!payment) {
-
-            return res.status(404).json({
-
-                success: false,
-                message: "Payment not found."
-
-            });
-
-        }
-
-        if (payment.userId.toString() !== req.user._id.toString()) {
-
-            return res.status(403).json({
-
-                success: false,
-                message: "Unauthorized."
-
-            });
-
-        }
-
-        res.json({
-
-            success: true,
-            payment,
-
-        });
-
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found.",
+      });
     }
 
-    catch (err) {
-
-        res.status(500).json({
-
-            success: false,
-            message: err.message,
-
-        });
-
+    if (payment.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized.",
+      });
     }
 
+    return res.json({
+      success: true,
+      payment,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
 };

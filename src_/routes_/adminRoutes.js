@@ -16,6 +16,7 @@ const {
     getAllFans,
     getMemberships,
     deleteUser,
+    getReviewedContent,
 } = require("../controllers_/adminController");
 const auth = require('../middleware_/authMiddleware');
 const role = require('../middleware_/roleMiddleware');
@@ -97,6 +98,13 @@ router.delete(
   auth,
   role(["admin"]),
   deleteUser
+);
+
+router.get(
+  "/content/reviewed",
+  auth,
+  role(["admin"]),
+  getReviewedContent
 );
 module.exports = router;
 
