@@ -32,7 +32,7 @@ exports.depositToWallet = async (req, res) => {
     };
 
     const { data } = await axios.post(
-      "https://api.nowpayments.io/v1/invoice",
+      "https://api.nowpayments.io/v1/payment",
       paymentData,
       {
         headers: {
@@ -57,11 +57,29 @@ exports.depositToWallet = async (req, res) => {
 
       orderId,
 
-      invoiceId: data.id,
+      paymentId:
+        invoice.payment_id,
 
-      invoiceUrl: data.invoice_url,
+    invoiceId:
+        invoice.payment_id,
 
-      paymentStatus: "waiting",
+    payAddress:
+        invoice.pay_address,
+
+    payAmount:
+        invoice.pay_amount,
+
+    payCurrency:
+        invoice.pay_currency,
+
+    network:
+        invoice.network,
+
+    validUntil:
+        invoice.valid_until,
+
+    paymentStatus:
+        invoice.payment_status || "waiting",
 
       orderDescription: "Wallet Deposit",
     });
@@ -127,7 +145,7 @@ exports.buyCoins = async (req, res) => {
     };
 
     const { data } = await axios.post(
-      "https://api.nowpayments.io/v1/invoice",
+      "https://api.nowpayments.io/v1/payment",
       paymentData,
       {
         headers: {
@@ -150,11 +168,29 @@ exports.buyCoins = async (req, res) => {
 
       orderId,
 
-      invoiceId: data.id,
+      paymentId:
+        invoice.payment_id,
 
-      invoiceUrl: data.invoice_url,
+    invoiceId:
+        invoice.payment_id,
 
-      paymentStatus: "waiting",
+    payAddress:
+        invoice.pay_address,
+
+    payAmount:
+        invoice.pay_amount,
+
+    payCurrency:
+        invoice.pay_currency,
+
+    network:
+        invoice.network,
+
+    validUntil:
+        invoice.valid_until,
+
+    paymentStatus:
+        invoice.payment_status || "waiting",
 
       orderDescription: `${quantity} ${coinType} coins`,
 

@@ -1,40 +1,164 @@
-const express = require('express');
+// const express = require('express');
+// const router = express.Router();
+// const { createSubscription, getMyPayments, cancelPayment, paymentWebhook, getPaymentByInvoiceId, createSubscriptionPayment } = require('../controllers_/PaymentController');
+// const auth = require('../middleware_/authMiddleware');
+
+// router.post(
+//     "/create-subscription",
+//     auth,
+//     createSubscription
+// );
+
+// router.get(
+//     "/",
+//     auth,
+//     getMyPayments
+// );
+
+
+
+// router.patch(
+//     "/cancel/:id",
+//     auth,
+//     cancelPayment
+// );
+
+// router.post(
+//     "/webhook",
+//     paymentWebhook
+// );
+// router.post(
+//     "/subscription",
+//     auth,
+//     createSubscriptionPayment
+// );
+// router.get(
+//     "/invoice/:invoiceId",
+//     auth,
+//     getPaymentByInvoiceId
+// );
+// module.exports = router;
+
+
+const express = require("express");
+
 const router = express.Router();
-const { createSubscription, getMyPayments, cancelPayment, paymentWebhook, getPaymentByInvoiceId, createSubscriptionPayment } = require('../controllers_/PaymentController');
-const auth = require('../middleware_/authMiddleware');
+
+const auth = require("../middleware_/authMiddleware");
+
+const paymentController = require("../payments/payment.controller");
+
+const webhookController = require("../payments/webhook.controller");
+
+
+
+/*
+=====================================
+Membership
+=====================================
+*/
 
 router.post(
-    "/create-subscription",
+    "/membership",
     auth,
-    createSubscription
+    paymentController.createMembership
 );
+
+
+
+/*
+=====================================
+Creator Subscription
+=====================================
+*/
+
+router.post(
+    "/subscription",
+    auth,
+    paymentController.createSubscription
+);
+
+
+
+/*
+=====================================
+Wallet Deposit
+=====================================
+*/
+
+router.post(
+    "/wallet/deposit",
+    auth,
+    paymentController.depositWallet
+);
+
+
+
+/*
+=====================================
+Buy Coins
+=====================================
+*/
+
+router.post(
+    "/wallet/coins",
+    auth,
+    paymentController.buyCoins
+);
+
+
+
+/*
+=====================================
+Payment History
+=====================================
+*/
 
 router.get(
     "/",
     auth,
-    getMyPayments
+    paymentController.getPayments
 );
 
 
+
+/*
+=====================================
+Single Payment
+=====================================
+*/
+
+router.get(
+    "/:id",
+    auth,
+    paymentController.getPayment
+);
+
+
+
+/*
+=====================================
+Cancel Payment
+=====================================
+*/
 
 router.patch(
-    "/cancel/:id",
+    "/:id/cancel",
     auth,
-    cancelPayment
+    paymentController.cancelPayment
 );
 
+
+
+/*
+=====================================
+Universal Webhooks
+=====================================
+*/
+
 router.post(
-    "/webhook",
-    paymentWebhook
+    "/webhook/:provider",
+    webhookController.handleWebhook
 );
-router.post(
-    "/subscription",
-    auth,
-    createSubscriptionPayment
-);
-router.get(
-    "/invoice/:invoiceId",
-    auth,
-    getPaymentByInvoiceId
-);
+
 module.exports = router;

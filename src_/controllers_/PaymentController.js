@@ -305,7 +305,7 @@ exports.createSubscriptionPayment = async (
     };
 
     const { data } = await axios.post(
-      "https://api.nowpayments.io/v1/invoice",
+      "https://api.nowpayments.io/v1/payment",
       paymentData,
       {
         headers: {
@@ -334,11 +334,29 @@ exports.createSubscriptionPayment = async (
 
       orderId,
 
-      invoiceId: data.id,
+    paymentId:
+        invoice.payment_id,
 
-      invoiceUrl: data.invoice_url,
+    invoiceId:
+        invoice.payment_id,
 
-      paymentStatus: "waiting",
+    payAddress:
+        invoice.pay_address,
+
+    payAmount:
+        invoice.pay_amount,
+
+    payCurrency:
+        invoice.pay_currency,
+
+    network:
+        invoice.network,
+
+    validUntil:
+        invoice.valid_until,
+
+    paymentStatus:
+        invoice.payment_status || "waiting",
 
       orderDescription:
         paymentData.order_description,

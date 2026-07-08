@@ -48,9 +48,16 @@ const PaymentSchema = new mongoose.Schema(
     },
 
     paymentProvider: {
-      type: String,
-      default: "NOWPayments",
-    },
+    type: String,
+    enum: [
+        "nowpayments",
+        "paxum",
+        "stripe",
+        "flutterwave",
+        "paystack",
+    ],
+    default: "nowpayments",
+},
 
     orderId: {
       type: String,
@@ -89,10 +96,17 @@ const PaymentSchema = new mongoose.Schema(
 
       pricePerCoin: Number,
     },
-paymentId: {
-    type: String,
-    default: null,
-},
+paymentId: String,
+
+payAddress: String,
+
+payAmount: Number,
+
+payCurrency: String,
+
+network: String,
+
+validUntil: Date,
     amountReceived: {
       type: Number,
       default: 0,
