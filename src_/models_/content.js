@@ -155,7 +155,21 @@ storageKey:{
     type: Boolean,
     default: true,
   },
+reviewComment: {
+    type: String,
+    default: "",
+},
 
+reviewedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+    default: null,
+},
+
+reviewedAt: {
+    type: Date,
+    default: null,
+},
   protection: {
     type: Object,
     default: {},

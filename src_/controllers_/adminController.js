@@ -174,10 +174,10 @@ exports.approveContent = async (req, res) => {
                 error: "Content not found.",
             });
         }
-if (content.status !== "pending") {
+if (content.status !== "pending_review") {
     return res.status(400).json({
         success: false,
-        message: "Only pending content can be approved."
+        message: "Only pending review content can be approved."
     });
 }
         content.status = "scheduled";
@@ -205,16 +205,18 @@ exports.rejectContent = async (req, res) => {
     try {
 
         const content = await Content.findById(req.params.id);
-
+console.log("==============");
+console.log("CONTENT STATUS:", content?.status);
+console.log("REQUEST BODY:", req.body);
         if (!content) {
             return res.status(404).json({
                 error: "Content not found.",
             });
         }
-if (content.status !== "pending") {
+if (content.status !== "pending_review") {
     return res.status(400).json({
         success: false,
-        message: "Only pending content can be rejected."
+        message: "Only pending review content can be approved."
     });
 }
         content.status = "rejected";
