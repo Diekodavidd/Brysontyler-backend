@@ -1,38 +1,49 @@
 const blockedWords = [
-  "whatsapp",
-  "telegram",
-  "signal",
-  "wechat",
-  "snapchat",
-  "discord",
-  "imo",
-  "line",
-  "viber",
-  "skype",
 
-  "instagram",
-  "facebook",
-  "twitter",
-  "x.com",
-  "tiktok",
+    "whatsapp",
+    "telegram",
+    "signal",
+    "wechat",
+    "snapchat",
+    "discord",
+    "imo",
+    "line",
+    "viber",
+    "skype",
 
-  "call me",
-  "text me",
-  "dm me",
-  "contact me",
-  "reach me",
+    "instagram",
+    "facebook",
+    "twitter",
+    "x.com",
+    "tiktok",
 
-  "gmail",
-  "hotmail",
-  "yahoo",
-  "outlook",
+    "gmail",
+    "hotmail",
+    "yahoo",
+    "outlook",
+
+    "paypal",
+    "cashapp",
+    "venmo",
+    "zelle",
+
+    "onlyfans",
+    "fansly",
+
+    "call me",
+    "text me",
+    "message me",
+    "dm me",
+    "reach me",
+    "contact me",
+
 ];
 
 const phoneRegex =
   /(\+?\d[\d\s().-]{7,}\d)/gi;
 
 const emailRegex =
-  /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+  /\b[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}\b/i;
 
 const urlRegex =
   /(https?:\/\/[^\s]+)|(www\.[^\s]+)/gi;

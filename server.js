@@ -29,6 +29,7 @@ app.use('/payments', require('./src_/routes_/paymentRoutes'));
 app.use('/subscriptions', require('./src_/routes_/subscriptionRoutes'));
 app.use('/creator', require('./src_/routes_/creatorRoutes'));
 app.use('/live', require('./src_/routes_/liveRoutes'));
+app.use('/messages', require('./src_/routes_/messageRoutes'));
 app.use('/admin', require('./src_/routes_/adminRoutes'));
 app.use('/webhooks', require('./src_/routes_/webhookRoutes'));
 app.use('/coins', require('./src_/routes_/coinRoutes'));

@@ -141,7 +141,7 @@ const UserSchema = new mongoose.Schema(
 
     subscriptionPrice: {
       type: Number,
-      default: 19.99,
+      default: 0,
     },
 
     // ==========================

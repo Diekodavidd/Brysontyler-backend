@@ -61,7 +61,9 @@ const ConversationSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
-
+ConversationSchema.index({
+    lastMessageAt: -1,
+});
 /*
 Only ONE conversation
 between a fan and creator.

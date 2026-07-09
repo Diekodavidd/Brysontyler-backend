@@ -1,12 +1,14 @@
-const Conversation = require("../models/Conversation");
-const Message = require("../models/Message");
-const User = require("../models/User");
+const Conversation = require("../models_/conversation");
+const Message = require("../models_/message");
+const subscription = require("../models_/subscription");
+const User = require("../models_/user");
+const { emitToUser } = require("../socket/socket");
 
-const { containsRestrictedContent } = require("../utils/chatFilter");
+const { containsRestrictedContent } = require("../utils_/chatFilter");
 
 // Replace this with your own upload helper later.
-const uploadToCloudinary =
-  require("../utils/uploadToCloudinary");
+const cloudinary =
+  require("../utils_/cloudinary");
 
 /*
 ==========================================
@@ -39,7 +41,7 @@ async function uploadAttachment(file) {
   */
 
   const uploaded =
-    await uploadToCloudinary(file.path);
+    await cloudinary(file.path);
 
   return {
     url: uploaded.secure_url,
@@ -49,11 +51,7 @@ async function uploadAttachment(file) {
   };
 }
 
-/*
-==========================================
-SEND MESSAGE
-==========================================
-*/
+
 
 exports.sendMessage = async (
   req,
@@ -61,7 +59,8 @@ exports.sendMessage = async (
 ) => {
   try {
     const senderId = req.user.id;
-
+console.log("BODY:", req.body);
+console.log("FILE:", req.file);
     const {
       creatorId,
       text = "",
@@ -303,7 +302,10 @@ exports.sendMessage = async (
         attachment,
 
       });
-
+await message.populate(
+    "sender",
+    "_id name profileImage"
+);
     /*
     ----------------------------------
     Update conversation
@@ -334,7 +336,12 @@ exports.sendMessage = async (
     }
 
     await conversation.save();
+emitToUser (receiverId, "new-message", {
+    conversationId: conversation._id,
+    message,
+});
 
+emitToUser(receiverId, "conversation-updated", conversation);
     /*
     Socket event
     will go here later.
@@ -370,3 +377,456 @@ exports.sendMessage = async (
   }
 };
 
+exports.getConversations = async (req, res) => {
+
+    try {
+
+        const user = req.user;
+
+        const query =
+            user.role === "creator"
+                ? { creatorId: user._id }
+                : { fanId: user._id };
+
+        const conversations =
+            await Conversation.find(query)
+
+                .populate(
+                    "fanId",
+                    "_id name profileImage"
+                )
+
+                .populate(
+                    "creatorId",
+                    "_id name stageName profileImage"
+                )
+
+                .sort({
+                    lastMessageAt: -1,
+                });
+
+        return res.json({
+
+            success: true,
+
+            conversations,
+
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+
+            success: false,
+
+            message: err.message,
+
+        });
+
+    }
+
+};
+
+exports.getConversationMessages = async (
+    req,
+    res
+) => {
+console.log(req.user);
+    try {
+
+        
+
+        const conversation =
+            await Conversation.findById(
+                req.params.conversationId
+            );
+
+        if (!conversation) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message:
+                    "Conversation not found.",
+
+            });
+
+        }
+
+        if (
+            !conversation.members.some(
+                member =>
+                    member.toString() ===
+                    req.user._id.toString()
+            )
+        ) {
+
+            return res.status(403).json({
+
+                success: false,
+
+                message:
+                    "Unauthorized.",
+
+            });
+
+        }
+
+        const messages =
+            await Message.find({
+
+                conversationId:
+                    conversation._id,
+
+            })
+
+                .populate(
+                    "sender",
+                    "_id name profileImage"
+                )
+
+                .populate(
+                    "receiver",
+                    "_id name profileImage"
+                )
+
+                .sort({
+
+                    createdAt: 1,
+
+                });
+
+        return res.json({
+
+            success: true,
+
+            messages,
+
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+
+            success: false,
+
+            message: err.message,
+
+        });
+
+    }
+
+};
+
+exports.markConversationRead = async (
+    req,
+    res
+) => {
+
+    try {
+
+       
+
+        const conversation =
+            await Conversation.findById(
+                req.params.conversationId
+            );
+
+        if (!conversation) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message:
+                    "Conversation not found.",
+
+            });
+
+        }
+
+        await Message.updateMany(
+
+            {
+
+                conversationId:
+                    conversation._id,
+
+                receiver:
+                    req.user._id,
+
+                read: false,
+
+            },
+
+            {
+
+                $set: {
+
+                    read: true,
+
+                },
+
+            }
+
+        );
+
+        if (req.user.role === "fan") {
+
+            conversation.unreadFan = 0;
+
+        } else {
+
+            conversation.unreadCreator = 0;
+
+        }
+
+        await conversation.save();
+
+        return res.json({
+
+            success: true,
+
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+
+            success: false,
+
+            message: err.message,
+
+        });
+
+    }
+
+};
+
+exports.editMessage = async (
+    req,
+    res
+) => {
+
+    try {
+
+   
+
+        const { text } = req.body;
+
+        const message =
+            await Message.findById(
+                req.params.messageId
+            );
+
+        if (!message) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message:
+                    "Message not found.",
+
+            });
+
+        }
+
+        if (
+            message.sender.toString() !==
+            req.user._id.toString()
+        ) {
+
+            return res.status(403).json({
+
+                success: false,
+
+                message:
+                    "Unauthorized.",
+
+            });
+
+        }
+
+        message.text = text;
+
+        message.edited = true;
+
+        await message.save();
+
+        return res.json({
+
+            success: true,
+
+            message,
+
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+
+            success: false,
+
+            message: err.message,
+
+        });
+
+    }
+
+};
+
+exports.deleteMessage = async (
+    req,
+    res
+) => {
+
+    try {
+
+        
+
+        const message =
+            await Message.findById(
+                req.params.messageId
+            );
+
+        if (!message) {
+
+            return res.status(404).json({
+
+                success: false,
+
+                message:
+                    "Message not found.",
+
+            });
+
+        }
+
+        if (
+            message.sender.toString() !==
+            req.user._id.toString()
+        ) {
+
+            return res.status(403).json({
+
+                success: false,
+
+                message:
+                    "Unauthorized.",
+
+            });
+
+        }
+
+        message.deleted = true;
+
+        message.text = "";
+
+        message.attachment = undefined;
+
+        await message.save();
+
+        return res.json({
+
+            success: true,
+
+            message:
+                "Message deleted.",
+
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        return res.status(500).json({
+
+            success: false,
+
+            message: err.message,
+
+        });
+
+    }
+
+};
+
+exports.getDiscoverCreators = async (req, res) => {
+  try {
+
+    const creators = await User.find({
+      role: "creator",
+      "creatorApproval.status": "approved",
+    }).select(
+      "name profileImage bio creatorApplication.stageName"
+    );
+
+    const subscriptions = await subscription.find({
+      fanId: req.user._id,
+      status: "active",
+      endDate: { $gt: new Date() },
+    }).select("creatorId");
+
+    const subscribedIds = subscriptions.map((s) =>
+      s.creatorId.toString()
+    );
+
+    const result = creators.map((creator) => ({
+      ...creator.toObject(),
+      subscribed: subscribedIds.includes(
+        creator._id.toString()
+      ),
+    }));
+
+    res.json({
+      success: true,
+      creators: result,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+exports.getSubscribedFans = async (req, res) => {
+    try {
+        const creatorId = req.user._id;
+
+        const subscriptions = await subscription.find({
+            creatorId,
+            status: "active",
+        }).populate(
+            "fanId",
+            "_id name profileImage username creatorApplication"
+        );
+
+        const fans = subscriptions
+            .map(sub => sub.fanId)
+            .filter(Boolean);
+
+        res.json({
+            success: true,
+            fans,
+        });
+
+    } catch (err) {
+        console.error(err);
+
+        res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+    }
+};

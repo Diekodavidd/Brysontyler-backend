@@ -83,9 +83,20 @@ function getIO() {
 function getUserSocket(userId) {
     return onlineUsers.get(userId.toString());
 }
+function emitToUser(userId, event, payload) {
+
+    const socketId = getUserSocket(userId);
+
+    if (!socketId) return;
+
+    io.to(socketId).emit(event, payload);
+
+}
 
 module.exports = {
     initializeSocket,
     getIO,
     getUserSocket,
+    emitToUser,
 };
+

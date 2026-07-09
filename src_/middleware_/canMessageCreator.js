@@ -1,11 +1,11 @@
-const User = require("../models/User");
-const Subscription = require("../models/Subscription");
+const User = require("../models_/user");
+const Subscription = require("../models_/subscription");
 
-module.exports = async (
-  req,
-  res,
-  next
-) => {
+module.exports = async (req, res, next) => {
+  console.log("===== canMessageCreator =====");
+  console.log("BODY:", req.body);
+  console.log("QUERY:", req.query);
+
   try {
     const sender = req.user;
 
@@ -18,7 +18,7 @@ module.exports = async (
     }
 
     const { creatorId } = req.body;
-
+console.log("creatorId:", creatorId);
     if (!creatorId) {
       return res.status(400).json({
         success: false,
@@ -41,34 +41,32 @@ module.exports = async (
     Membership check
     */
 
-    if (
-      !["VIP", "Elite"].includes(
-        fan.membership.plan
-      )
-    ) {
-      return res.status(403).json({
+  if (!["VIP", "ELITE"].includes(fan.membership.plan)) {
+    return res.status(403).json({
         success: false,
-        message:
-          "Upgrade to VIP to message creators.",
-      });
-    }
-
+        message: "Upgrade to VIP or ELITE to message creators.",
+    });
+}
     /*
     Membership expiry
     */
 
-    if (
-      fan.membership.endDate &&
-      fan.membership.endDate <
-        new Date()
-    ) {
-      return res.status(403).json({
+  if (fan.membership.status !== "active") {
+    return res.status(403).json({
         success: false,
-        message:
-          "Membership has expired.",
-      });
-    }
+        message: "Membership is not active.",
+    });
+}
 
+if (
+    fan.membership.endDate &&
+    fan.membership.endDate < new Date()
+) {
+    return res.status(403).json({
+        success: false,
+        message: "Membership has expired.",
+    });
+}
     /*
     Active subscription
     */
