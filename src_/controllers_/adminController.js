@@ -252,7 +252,7 @@ exports.getPendingContent = async (req, res) => {
 })
         .populate(
             "creatorId",
-            "name email profileImage creatorVerification"
+            "name email profileImage creatorApplication"
         )
 
         .sort({
@@ -620,7 +620,7 @@ exports.getReviewedContent = async (req, res) => {
     })
       .populate(
         "creatorId",
-        "name creatorVerification profileImage"
+        "name creatorApplication profileImage"
       )
       .sort({
         reviewedAt: -1,

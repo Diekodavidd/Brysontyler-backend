@@ -117,7 +117,7 @@ exports.diditWebhook = async (req, res) => {
             user.kycStatus = "approved";
             user.didit.verifiedAt = new Date();
 
-            // user.creatorVerification.verified = true;
+            // user.creatorApplication.verified = true;
             // user.isVerifiedCreator = true;
 
         }
@@ -127,7 +127,7 @@ exports.diditWebhook = async (req, res) => {
             user.isKYCVerified = false;
             user.kycStatus = "rejected";
 
-            // user.creatorVerification.verified = false;
+            // user.creatorApplication.verified = false;
             // user.isVerifiedCreator = false;
 
         }
@@ -223,21 +223,21 @@ exports.updateCreatorProfile = async (req, res) => {
 
     const user = await User.findById(req.user._id);
 
-    user.creatorVerification.stageName =
+    user.creatorApplication.stageName =
         req.body.stageName;
 
-    user.creatorVerification.category =
+    user.creatorApplication.category =
         req.body.category;
 
-    user.creatorVerification.socialLinks =
+    user.creatorApplication.socialLinks =
         req.body.socialLinks;
 
     await user.save();
 
     res.json({
         success: true,
-        creatorVerification:
-            user.creatorVerification
+        creatorApplication:
+            user.creatorApplication
     });
 
 };

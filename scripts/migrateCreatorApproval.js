@@ -23,13 +23,13 @@ async function migrate() {
                 creatorApplication: {
 
                     stageName:
-                        user.creatorVerification?.stageName || "",
+                        user.creatorApplication?.stageName || "",
 
                     category:
-                        user.creatorVerification?.category || "",
+                        user.creatorApplication?.category || "",
 
                     socialLinks:
-                        user.creatorVerification?.socialLinks || [],
+                        user.creatorApplication?.socialLinks || [],
 
                     submittedAt:
                         user.createdAt,
@@ -62,7 +62,7 @@ async function migrate() {
 
             $unset: {
 
-                creatorVerification: "",
+                creatorApplication: "",
 
                 isVerifiedCreator: "",
 

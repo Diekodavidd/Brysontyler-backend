@@ -238,15 +238,18 @@ exports.completeProfile = async (req, res) => {
         user.bio = bio;
         user.profileCompleted = true;
 
-        await user.save();
+      await user.save();
 
+try {
+    await profileCompletedEmail(user);
+} catch (err) {
+    console.error("Profile email failed:", err.message);
+}
 
-await profileCompletedEmail(user);
-        res.json({
-            success: true,
-            message: "Profile completed successfully."
-        });
-
+return res.json({
+    success: true,
+    message: "Profile completed successfully.",
+});
     } catch (error) {
 
         res.status(500).json({
@@ -536,4 +539,59 @@ exports.adminLogin = async (req, res) => {
         });
 
     }
+};
+
+exports.submitCreatorForReview = async (req, res) => {
+    
+  try {
+    const user = await User.findById(req.user._id);
+console.log("USER ROLE:", user.role);
+console.log("STATUS:", user.creatorApproval?.status);
+    if (!user) {
+      return res.status(404).json({
+        error: "User not found",
+      });
+    }
+
+    if (user.role !== "creator") {
+      return res.status(400).json({
+        error: "Only creators can apply.",
+      });
+    }
+
+    if (user.creatorApproval.status === "pending") {
+      return res.status(400).json({
+        error: "Application already submitted.",
+      });
+    }
+
+    user.creatorApproval.status = "pending";
+    user.creatorApplication.submittedAt = new Date();
+
+    await user.save();
+
+    
+
+   const updatedUser = await User.findById(user._id)
+    .select("-password");
+
+res.json({
+    success: true,
+    user: updatedUser
+});
+
+// Send emails after responding
+try {
+    await creatorApplicationReceived(updatedUser);
+    await notifyAdminCreatorApplication(updatedUser);
+} catch (err) {
+    console.error(err);
+}
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+        error: err.message,
+    });
+}
 };

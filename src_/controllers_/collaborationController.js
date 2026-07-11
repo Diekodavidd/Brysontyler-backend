@@ -323,7 +323,7 @@ exports.discoverCreators = async (req, res) => {
       _id: { $ne: req.user._id },
     })
     .select(
-      "name email profilePic bio creatorVerification isVerifiedCreator"
+      "name email profilePic bio creatorApplication isVerifiedCreator"
     )
     .sort({
       createdAt: -1,

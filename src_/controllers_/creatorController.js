@@ -101,13 +101,13 @@ exports.updateProfile = async (req, res) => {
         user.state = req.body.state ?? user.state;
         user.city = req.body.city ?? user.city;
 
-        user.creatorVerification.stageName =
+        user.creatorApplication.stageName =
             req.body.stageName ??
-            user.creatorVerification.stageName;
+            user.creatorApplication.stageName;
 
-        user.creatorVerification.socialLinks =
+        user.creatorApplication.socialLinks =
             req.body.socialLinks ??
-            user.creatorVerification.socialLinks;
+            user.creatorApplication.socialLinks;
 
         await user.save();
 

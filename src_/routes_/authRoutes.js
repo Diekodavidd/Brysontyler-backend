@@ -32,7 +32,7 @@ const {
     getOnboardingStatus,
 
     submitCreatorApplication,
-    updateProfile,
+    updateProfile,submitCreatorForReview,
     adminLogin
 
 } = require("../controllers_/authController");
@@ -97,5 +97,10 @@ router.patch(
     updateProfile
 );
 
+
+router.patch(
+    "/submit-review",
+    auth,
+submitCreatorForReview);
 
 module.exports = router;
