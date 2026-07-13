@@ -32,7 +32,7 @@ const {
     getOnboardingStatus,
 
     submitCreatorApplication,
-    updateProfile,submitCreatorForReview,
+    updateProfile,submitCreatorForReview,getPublicProfile,
     adminLogin
 
 } = require("../controllers_/authController");
@@ -103,4 +103,15 @@ router.patch(
     auth,
 submitCreatorForReview);
 
+
+
+
+
+
+
+router.get(
+  "/public/profile/:username",
+  getPublicProfile
+);
+module.exports = router;
 module.exports = router;

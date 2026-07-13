@@ -1,4 +1,7 @@
 const User = require('../models_/user');
+
+const Content = require("../models_/content");
+
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { sendEmail } = require('../utils_/mailer');
@@ -594,4 +597,56 @@ try {
         error: err.message,
     });
 }
+};
+
+
+exports.getPublicProfile = async (req, res) => {
+  try {
+    const { username } = req.params;
+
+    const user = await User.findOne({
+      $or: [
+        {
+          "creatorApplication.stageName": username,
+        },
+        {
+          name: new RegExp(`^${username}$`, "i"),
+        },
+      ],
+    }).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Profile not found",
+      });
+    }
+
+    const videos = await Content.find({
+      creatorId: user._id,
+      status: "published",
+    })
+      .select(
+        "title description thumbnail previewUrl duration membership views visibility mediaType createdAt"
+      )
+      .sort({ createdAt: -1 })
+      .limit(12)
+      .lean();
+
+    res.json({
+      success: true,
+      profile: user,
+      videos,
+      stats: {
+        totalVideos: videos.length,
+      },
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to load profile",
+    });
+  }
 };
