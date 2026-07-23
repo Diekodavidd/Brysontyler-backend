@@ -1,4 +1,4 @@
-const Notification = require("../models_/Notification");
+const Notification = require("../models_/notification");
 
 /*
 ========================================
