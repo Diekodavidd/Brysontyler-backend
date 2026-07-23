@@ -1,5 +1,6 @@
 const Collaboration = require('../models_/collaboration');
 const Content = require('../models_/content');
+const mongoose = require("mongoose");
 
 const User = require("../models_/user");
 exports.sendCollaborationRequest = async (req, res) => {
@@ -94,41 +95,79 @@ exports.sendCollaborationRequest = async (req, res) => {
 exports.respondToCollaboration = async (req, res) => {
     try {
 
-        const { requestId, status } = req.body;
+        const {
+            requestId,
+            status,
+        } = req.body;
 
-        if (!requestId || !["accepted", "rejected"].includes(status)) {
+        if (
+            !requestId ||
+            !["accepted", "rejected"].includes(status)
+        ) {
             return res.status(400).json({
-                error: "Invalid request."
+                success: false,
+                error: "Invalid request.",
             });
         }
 
-        const request = await Collaboration.findById(requestId);
+        const request =
+            await Collaboration.findById(
+                requestId
+            );
 
         if (!request) {
             return res.status(404).json({
-                error: "Collaboration request not found."
+                success: false,
+                error:
+                    "Collaboration request not found.",
             });
         }
 
-        if (request.receiverId.toString() !== req.user._id.toString()) {
+        if (
+            request.receiverId.toString() !==
+            req.user._id.toString()
+        ) {
             return res.status(403).json({
-                error: "You are not authorized to respond to this request."
+                success: false,
+                error:
+                    "You are not authorized to respond to this request.",
+            });
+        }
+
+        if (request.status !== "pending") {
+            return res.status(400).json({
+                success: false,
+                error:
+                    "This collaboration request has already been handled.",
             });
         }
 
         request.status = status;
 
+        request.respondedAt = new Date();
+
+        request.respondedBy =
+            req.user._id;
+
         await request.save();
 
-        res.json({
+        return res.status(200).json({
             success: true,
-            request
+            message:
+                `Collaboration request ${status}.`,
+            request,
         });
 
     } catch (error) {
 
-        res.status(500).json({
-            error: error.message
+        console.error(
+            "RESPOND COLLABORATION ERROR:",
+            error
+        );
+
+        return res.status(500).json({
+            success: false,
+            error: error.message,
         });
 
     }
@@ -239,41 +278,67 @@ exports.getIncomingRequests = async (req, res) => {
     }
 };
 
+
 exports.getCollaborationById = async (req, res) => {
-    try {
+  try {
+    const { id } = req.params;
 
-        const request = await Collaboration.findById(req.params.id)
-            .populate("senderId", "name email")
-            .populate("receiverId", "name email")
-            .populate("contentId", "title");
-
-        if (!request) {
-            return res.status(404).json({
-                error: "Collaboration request not found."
-            });
-        }
-
-        if (
-            request.senderId._id.toString() !== req.user._id.toString() &&
-            request.receiverId._id.toString() !== req.user._id.toString()
-        ) {
-            return res.status(403).json({
-                error: "Unauthorized."
-            });
-        }
-
-        res.json({
-            success: true,
-            request
-        });
-
-    } catch (error) {
-
-        res.status(500).json({
-            error: error.message
-        });
-
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid collaboration ID.",
+      });
     }
+
+    const request =
+      await Collaboration.findById(id)
+        .populate(
+          "senderId",
+          "name email profilePic"
+        )
+        .populate(
+          "receiverId",
+          "name email profilePic"
+        );
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        error: "Collaboration request not found.",
+      });
+    }
+
+    const currentUserId =
+      req.user._id.toString();
+
+    if (
+      request.senderId._id.toString() !==
+        currentUserId &&
+      request.receiverId._id.toString() !==
+        currentUserId
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: "Unauthorized.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      request,
+    });
+
+  } catch (error) {
+    console.error(
+      "GET COLLABORATION ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
 };
 
 exports.cancelCollaborationRequest = async (req, res) => {
@@ -317,29 +382,35 @@ exports.cancelCollaborationRequest = async (req, res) => {
 
 exports.discoverCreators = async (req, res) => {
   try {
-
     const creators = await User.find({
       role: "creator",
-      _id: { $ne: req.user._id },
+      _id: {
+        $ne: req.user._id,
+      },
     })
-    .select(
-      "name email profilePic bio creatorApplication isVerifiedCreator"
-    )
-    .sort({
-      createdAt: -1,
-    });
+      .select(
+        "_id name email profilePic bio creatorApplication isVerifiedCreator"
+      )
+      .sort({
+        createdAt: -1,
+      })
+      .lean();
 
-    res.json({
+    return res.status(200).json({
       success: true,
       count: creators.length,
       creators,
     });
 
   } catch (error) {
+    console.error(
+      "DISCOVER CREATORS ERROR:",
+      error
+    );
 
-    res.status(500).json({
+    return res.status(500).json({
+      success: false,
       error: error.message,
     });
-
   }
 };

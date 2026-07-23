@@ -1,51 +1,47 @@
 const mongoose = require("mongoose");
 
 const CollaborationSchema = new mongoose.Schema(
-{
-    fanId:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"User",
-        required:true
+  {
+    senderId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
 
-    creatorId:{
-        type:mongoose.Schema.Types.ObjectId,
-        ref:"User",
-        required:true
+    receiverId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
     },
 
-    amount:{
-        type:Number,
-        required:true,
-        min:0
+    message: {
+      type: String,
+      default: "",
+      trim: true,
     },
 
-    status:{
-        type:String,
-        enum:[
-            "active",
-            "expired",
-            "cancelled"
-        ],
-        default:"active"
+    status: {
+      type: String,
+      enum: [
+        "pending",
+        "accepted",
+        "rejected",
+        "cancelled",
+      ],
+      default: "pending",
     },
 
-    startDate:{
-        type:Date,
-        default:Date.now
+    respondedAt: {
+      type: Date,
+      default: null,
     },
-
-    endDate:{
-        type:Date,
-        required:true
-    }
-
-},
-{
-    timestamps:true
-});
+  },
+  {
+    timestamps: true,
+  }
+);
 
 module.exports = mongoose.model(
-    "Collaboration",
-    CollaborationSchema
+  "Collaboration",
+  CollaborationSchema
 );

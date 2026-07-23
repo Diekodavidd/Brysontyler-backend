@@ -1,119 +1,312 @@
 const User = require("../models_/user");
 const Content = require("../models_/content");
+const Subscription = require("../models_/subscription");
+const Payment = require("../models_/payment");
+const createNotification = require("../utils_/createNotification");
 
 exports.getStats = async (req, res) => {
-    try {
+  try {
+    // =========================================
+    // BASIC STATS
+    // =========================================
 
-        const totalFans = await User.countDocuments({
-    role: "fan",
-});
+    const totalFans = await User.countDocuments({
+      role: "fan",
+    });
 
-const totalCreators = await User.countDocuments({
-    role: "creator",
-});
+    const totalCreators = await User.countDocuments({
+      role: "creator",
+    });
 
-console.log({
-    totalFans,
-    totalCreators,
-});
-        
-        const pendingApplications = await User.countDocuments({
-    role: "creator",
-    "creatorApproval.status": "pending",
-});
+    const pendingApplications = await User.countDocuments({
+      role: "creator",
+      "creatorApproval.status": "pending",
+    });
 
-        const vipMembers = await User.countDocuments({
-            "membership.plan": "VIP",
-        });
+    const vipMembers = await User.countDocuments({
+      "membership.plan": "VIP",
+    });
 
-        const eliteMembers = await User.countDocuments({
-            "membership.plan": "ELITE",
-        });
+    const eliteMembers = await User.countDocuments({
+      "membership.plan": "ELITE",
+    });
 
-        const freeMembers = await User.countDocuments({
-            "membership.plan": "FREE",
-        });
+    const freeMembers = await User.countDocuments({
+      "membership.plan": "FREE",
+    });
 
-        const totalBrandVideos = await Content.countDocuments({
-            type: "brand",
-        });
+    const totalBrandVideos = await Content.countDocuments({
+      ownerType: "brand",
+    });
 
-        const pendingContent = await Content.countDocuments({
-            status: "pending_review",
-        });
+    const pendingContent = await Content.countDocuments({
+      status: "pending_review",
+    });
 
-        const publishedVideos = await Content.countDocuments({
-            status: "published",
-        });
+    const publishedVideos = await Content.countDocuments({
+      status: "published",
+    });
 
-        const featuredVideos = await Content.countDocuments({
-            featured: true,
-        });
+    const featuredVideos = await Content.countDocuments({
+      featured: true,
+    });
 
-        const draftVideos = await Content.countDocuments({
-            status: "draft",
-        });
+    const draftVideos = await Content.countDocuments({
+      status: "draft",
+    });
 
-        const scheduledVideos = await Content.countDocuments({
-            status: "scheduled",
-        });
+    const scheduledVideos = await Content.countDocuments({
+      status: "scheduled",
+    });
 
-        const pendingCreators = await User.find({
-    role: "creator",
-    "creatorApproval.status": "pending",
-})
-    .select(`
+
+    // =========================================
+    // PENDING CREATORS
+    // =========================================
+
+    const pendingCreators = await User.find({
+      role: "creator",
+      "creatorApproval.status": "pending",
+    })
+      .select(`
         name
         profileImage
         creatorApplication
         creatorApproval
         createdAt
-    `)
-    .sort({ createdAt: -1 })
-    .limit(5);
+      `)
+      .sort({ createdAt: -1 })
+      .limit(5);
 
-        const latestUsers = await User.find()
-            .select("name role createdAt")
-            .sort({ createdAt: -1 })
-            .limit(6);
 
-        res.json({
-            success: true,
+    // =========================================
+    // LATEST USERS
+    // =========================================
 
-            stats: {
-                totalFans,
-                totalCreators,
-                pendingApplications,
-                vipMembers,
-                eliteMembers,
-                freeMembers,
-                totalBrandVideos,
-                pendingContent,
-                publishedVideos,
-                featuredVideos,
-                draftVideos,
-                scheduledVideos,
+    const latestUsers = await User.find()
+      .select("name role createdAt")
+      .sort({ createdAt: -1 })
+      .limit(6);
 
-                totalRevenue: 0,
-                pendingPayouts: 0,
-                todaysRevenue: 0,
-            },
 
-            pendingCreators,
-            latestUsers,
-        });
-        const users = await User.find().select("name role membership");
+    // =========================================
+    // NOTIFICATIONS
+    // =========================================
 
-console.log(users);
+    const notifications = [];
 
-    } catch (err) {
 
-        res.status(500).json({
-            error: err.message,
-        });
+    // -----------------------------------------
+    // NEW USER SIGNUPS
+    // -----------------------------------------
 
-    }
-};  
+    const newUsers = await User.find()
+      .select("name role createdAt")
+      .sort({ createdAt: -1 })
+      .limit(20);
+
+    newUsers.forEach((user) => {
+      notifications.push({
+        id: `signup-${user._id}`,
+        type: "signup",
+        title: "New User Registered",
+        message: `${user.name} joined as a ${user.role}.`,
+        userId: user._id,
+        userName: user.name,
+        createdAt: user.createdAt,
+        unread: true,
+      });
+    });
+
+
+    // -----------------------------------------
+    // CREATOR APPLICATIONS
+    // -----------------------------------------
+
+    const creatorApplications = await User.find({
+      role: "creator",
+      "creatorApproval.status": {
+        $in: ["pending", "approved", "rejected"],
+      },
+    })
+      .select(
+        "name creatorApplication creatorApproval createdAt"
+      )
+      .sort({
+        "creatorApplication.submittedAt": -1,
+      })
+      .limit(20);
+
+    creatorApplications.forEach((creator) => {
+      const submittedAt =
+        creator.creatorApplication?.submittedAt ||
+        creator.createdAt;
+
+      notifications.push({
+        id: `creator-${creator._id}`,
+        type: "creator",
+        title: "Creator Application Submitted",
+        message: `${creator.name} submitted a creator application for approval.`,
+        userId: creator._id,
+        userName: creator.name,
+        createdAt: submittedAt,
+        unread: true,
+      });
+    });
+
+
+    // -----------------------------------------
+    // CREATOR CONTENT UPLOADS
+    // -----------------------------------------
+
+    const latestContent = await Content.find({
+      ownerType: "creator",
+    })
+      .populate("creatorId", "name")
+      .select(
+        "title creatorId status createdAt"
+      )
+      .sort({
+        createdAt: -1,
+      })
+      .limit(20);
+
+    latestContent.forEach((content) => {
+      notifications.push({
+        id: `content-${content._id}`,
+        type: "gallery",
+        title: "New Creator Content",
+        message: `${content.creatorId?.name || "A creator"} uploaded "${content.title}".`,
+        userId: content.creatorId?._id || null,
+        userName: content.creatorId?.name || "Unknown Creator",
+        contentId: content._id,
+        createdAt: content.createdAt,
+        unread: true,
+      });
+    });
+
+
+    // -----------------------------------------
+    // MEMBERSHIP UPGRADES
+    // -----------------------------------------
+
+    const membershipUsers = await User.find({
+      "membership.plan": {
+        $in: ["VIP", "ELITE"],
+      },
+      "membership.startDate": {
+        $exists: true,
+      },
+    })
+      .select(
+        "name membership"
+      )
+      .sort({
+        "membership.startDate": -1,
+      })
+      .limit(20);
+
+    membershipUsers.forEach((user) => {
+      notifications.push({
+        id: `membership-${user._id}`,
+        type: "membership",
+        title: "Membership Upgrade",
+        message: `${user.name} upgraded to ${user.membership.plan} membership.`,
+        userId: user._id,
+        userName: user.name,
+        plan: user.membership.plan,
+        createdAt:
+          user.membership.startDate ||
+          user.updatedAt,
+        unread: true,
+      });
+    });
+
+
+    // -----------------------------------------
+    // FAN CREATOR SUBSCRIPTIONS
+    // -----------------------------------------
+
+    const subscriptions = await Subscription.find()
+      .populate("fanId", "name")
+      .populate("creatorId", "name")
+      .sort({
+        createdAt: -1,
+      })
+      .limit(20);
+
+    subscriptions.forEach((subscription) => {
+      notifications.push({
+        id: `subscription-${subscription._id}`,
+        type: "subscription",
+        title: "New Creator Subscription",
+        message: `${subscription.fanId?.name || "A fan"} subscribed to ${subscription.creatorId?.name || "a creator"}.`,
+        userId: subscription.fanId?._id || null,
+        userName: subscription.fanId?.name || "Unknown Fan",
+        creatorId: subscription.creatorId?._id || null,
+        creatorName:
+          subscription.creatorId?.name ||
+          "Unknown Creator",
+        amount: subscription.amount || 0,
+        createdAt: subscription.createdAt,
+        unread: true,
+      });
+    });
+
+
+    // =========================================
+    // SORT ALL NOTIFICATIONS
+    // =========================================
+
+    notifications.sort(
+      (a, b) =>
+        new Date(b.createdAt) -
+        new Date(a.createdAt)
+    );
+
+
+    // =========================================
+    // RESPONSE
+    // =========================================
+
+    res.json({
+      success: true,
+
+      stats: {
+        totalFans,
+        totalCreators,
+        pendingApplications,
+        vipMembers,
+        eliteMembers,
+        freeMembers,
+        totalBrandVideos,
+        pendingContent,
+        publishedVideos,
+        featuredVideos,
+        draftVideos,
+        scheduledVideos,
+
+        totalRevenue: 0,
+        pendingPayouts: 0,
+        todaysRevenue: 0,
+      },
+
+      pendingCreators,
+
+      latestUsers,
+
+      notifications: notifications.slice(0, 50),
+    });
+
+  } catch (err) {
+    console.error("ADMIN STATS ERROR:", err);
+
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
 
 exports.getAllUsers = async (req, res) => {
     try {
@@ -185,7 +378,15 @@ if (content.status !== "pending_review") {
         content.reviewedAt = new Date();
 
         await content.save();
-
+await createNotification({
+  recipient: creator._id,
+  sender: req.user?._id || null,
+  type: "creator_content_approved",
+  title: "Content Approved",
+  message:
+    "Your content has been approved and is now scheduled for publication.",
+  link: "/dashboard/content",
+});
         res.json({
             success: true,
             message: "Content approved successfully.",
@@ -225,7 +426,16 @@ if (content.status !== "pending_review") {
         content.reviewedAt = new Date();
 
         await content.save();
-
+await createNotification({
+  recipient: creator._id,
+  sender: req.user?._id || null,
+  type: "creator_content_rejected",
+  title: "Content Rejected",
+  message: content.reviewComment
+    ? `Your content was rejected. Reason: ${content.reviewComment}`
+    : "Your content was rejected. Please review the feedback.",
+  link: "/dashboard/content",
+});
         res.json({
             success: true,
             message: "Content rejected.",
@@ -369,7 +579,16 @@ console.log("CREATOR =", user.creatorApproval);
         user.creatorApproval.rejectionReason = "";
 
         await user.save();
-        
+
+        await createNotification({
+  recipient: user._id,
+  sender: req.user?._id || null,
+  type: "creator_application_approved",
+  title: "Creator Application Approved",
+  message:
+    "Congratulations! Your creator application has been approved.",
+  link: "/dashboard",
+});
 
 await creatorApprovedEmail(user);
 
@@ -422,6 +641,17 @@ exports.rejectCreator = async (req, res) => {
             req.body.reason || "";
 
         await user.save();
+
+        await createNotification({
+  recipient: user._id,
+  sender: req.user?._id || null,
+  type: "creator_application_rejected",
+  title: "Creator Application Rejected",
+  message: rejectionReason
+    ? `Your creator application was rejected. Reason: ${rejectionReason}`
+    : "Your creator application was rejected.",
+  link: "/dashboard",
+});
 await creatorRejectedEmail(
     user,
     rejectionReason

@@ -94,14 +94,29 @@ storageKey:{
       ref: "User",
     },
   ],
+approvedCollaborators: [
+  {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "User",
+  },
+],
 
-  approvedCollaborators: [
-    {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-    },
+consentRequired: {
+  type: Boolean,
+  default: false,
+},
+
+participantConsentStatus: {
+  type: String,
+  enum: [
+    "not_required",
+    "pending",
+    "under_review",
+    "approved",
+    "rejected",
   ],
-
+  default: "not_required",
+},
   category: {
     type: String,
     default: "General",

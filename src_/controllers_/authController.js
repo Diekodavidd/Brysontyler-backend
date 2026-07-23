@@ -1,6 +1,7 @@
 const User = require('../models_/user');
 
 const Content = require("../models_/content");
+const createNotification = require("../utils_/createNotification");
 
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -544,12 +545,14 @@ exports.adminLogin = async (req, res) => {
     }
 };
 
+
 exports.submitCreatorForReview = async (req, res) => {
-    
   try {
     const user = await User.findById(req.user._id);
-console.log("USER ROLE:", user.role);
-console.log("STATUS:", user.creatorApproval?.status);
+
+    console.log("USER ROLE:", user?.role);
+    console.log("STATUS:", user?.creatorApproval?.status);
+
     if (!user) {
       return res.status(404).json({
         error: "User not found",
@@ -573,32 +576,50 @@ console.log("STATUS:", user.creatorApproval?.status);
 
     await user.save();
 
-    
+    const updatedUser = await User.findById(user._id)
+      .select("-password");
 
-   const updatedUser = await User.findById(user._id)
-    .select("-password");
+    // =========================================
+    // CREATOR NOTIFICATION
+    // =========================================
 
-res.json({
-    success: true,
-    user: updatedUser
-});
+    await createNotification({
+      recipient: user._id,
+      type: "creator_application_submitted",
+      title: "Application Submitted",
+      message:
+        "Your creator application has been submitted and is awaiting review.",
+      link: "/dashboard",
+    });
 
-// Send emails after responding
-try {
-    await creatorApplicationReceived(updatedUser);
-    await notifyAdminCreatorApplication(updatedUser);
-} catch (err) {
-    console.error(err);
-}
+    // =========================================
+    // RESPONSE
+    // =========================================
+
+    res.json({
+      success: true,
+      user: updatedUser,
+    });
+
+    // =========================================
+    // EMAILS
+    // =========================================
+
+    try {
+      await creatorApplicationReceived(updatedUser);
+      await notifyAdminCreatorApplication(updatedUser);
+    } catch (err) {
+      console.error("APPLICATION EMAIL ERROR:", err);
+    }
+
   } catch (err) {
     console.error(err);
 
     res.status(500).json({
-        error: err.message,
+      error: err.message,
     });
-}
+  }
 };
-
 
 exports.getPublicProfile = async (req, res) => {
   try {

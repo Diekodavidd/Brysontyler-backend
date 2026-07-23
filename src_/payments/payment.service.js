@@ -527,35 +527,27 @@ const completePayment = async (payment) => {
         MEMBERSHIP
         ==========================
         */
+case "membership": {
+  user.membership = {
+    plan: payment.membershipPlan,
+    status: "active",
+    startDate: new Date(),
+    endDate: new Date(
+      Date.now() +
+        30 * 24 * 60 * 60 * 1000
+    ),
+  };
 
-        case "membership":
+  await createNotification({
+    recipient: user._id,
+    type: "membership_upgraded",
+    title: "Membership Upgraded",
+    message: `Your ${payment.membershipPlan} membership is now active.`,
+    link: "/dashboard/membership",
+  });
 
-            user.membership = {
-
-                plan:
-                    payment.membershipPlan,
-
-                status:
-                    "active",
-
-                startDate:
-                    new Date(),
-
-                endDate:
-                    new Date(
-                        Date.now() +
-                        30 *
-                        24 *
-                        60 *
-                        60 *
-                        1000
-                    ),
-
-            };
-
-            break;
-
-
+  break;
+}
 
         /*
         ==========================

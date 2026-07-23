@@ -5,215 +5,523 @@ const { v4: uuid } = require("uuid");
 const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
+const createNotification = require("../utils_/createNotification");
+const ContentParticipant =
+  require("../models_/contentparticipant");
+
 
 exports.uploadContent = async (req, res) => {
+  try {
+    console.log("=========== UPLOAD ===========");
+    console.log("BODY:", req.body);
+    console.log("FILES:", req.files);
 
-        console.log("=========== UPLOAD ===========");
+    /*
+    --------------------------------
+    GET FILES
+    --------------------------------
+    */
 
-        console.log("BODY");
-        console.log(req.body);
+    const video = req.files?.find(
+      (file) => file.fieldname === "video"
+    );
 
-        console.log("FILES");
-        console.log(req.files);
+    const preview = req.files?.find(
+      (file) => file.fieldname === "preview"
+    );
 
-        console.log("VIDEO");
-        console.log(req.files?.video);
+    const thumbnail = req.files?.find(
+      (file) => file.fieldname === "thumbnail"
+    );
 
-        console.log("PREVIEW");
-        console.log(req.files?.preview);
+    const consentFiles =
+      req.files?.filter((file) =>
+        file.fieldname.startsWith("consent_")
+      ) || [];
 
-        console.log("THUMBNAIL");
-        console.log(req.files?.thumbnail);
-    try {
-        const video = req.files?.video?.[0];
-        const preview = req.files?.preview?.[0];
-        const thumbnail = req.files?.thumbnail?.[0];
+    /*
+    --------------------------------
+    VALIDATION
+    --------------------------------
+    */
 
-        if (!video) {
-            return res.status(400).json({
-                error: "Video is required.",
-            });
-        }
-
-        if (!preview) {
-            return res.status(400).json({
-                error: "Preview video is required.",
-            });
-        }
-
-        if (!thumbnail) {
-            return res.status(400).json({
-                error: "Thumbnail is required.",
-            });
-        }
-
-        if (!req.body.title) {
-            return res.status(400).json({
-                error: "Title is required.",
-            });
-        }
-
-        /* -----------------------------
-           Upload Full Video
-        ------------------------------ */
-
-        const videoExtension = path.extname(
-            video.originalname
-        );
-
-        const videoName =
-            `${uuid()}${videoExtension}`;
-
-        const bunnyVideo =
-            await uploadToBunny(
-                video.path,
-                videoName
-            );
-
-        /* -----------------------------
-           Upload Preview
-        ------------------------------ */
-
-        const previewExtension = path.extname(
-            preview.originalname
-        );
-
-        const previewName =
-            `${uuid()}${previewExtension}`;
-
-        const bunnyPreview =
-            await uploadToBunny(
-                preview.path,
-                previewName
-            );
-
-        /* -----------------------------
-           Upload Thumbnail
-        ------------------------------ */
-
-        const thumb =
-            await cloudinary.uploader.upload(
-                thumbnail.path,
-                {
-                    folder:
-                        "bryson-tyler/thumbnails",
-                }
-            );
-
-        if (fs.existsSync(thumbnail.path)) {
-            fs.unlinkSync(thumbnail.path);
-        }
-
-        /* -----------------------------
-           Create Content
-        ------------------------------ */
-
-        const content =
-            await Content.create({
-
-                creatorId: req.user._id,
-
-                title: req.body.title.trim(),
-
-                description:
-                    req.body.description || "",
-
-                category:
-                    req.body.category || "General",
-
-                tags: req.body.tags
-                    ? JSON.parse(req.body.tags)
-                    : [],
-
-                visibility:
-                    req.body.visibility || "free",
-
-                membership:
-                    req.body.membership || "free",
-
-                price: Number(
-                    req.body.price || 0
-                ),
-
-                releaseDate:
-                    req.body.releaseDate || null,
-
-                status:
-                    req.body.status ||
-                    "pending_review",
-
-                featured:
-                    req.body.featured === "true",
-
-                allowComments:
-                    req.body.allowComments !==
-                    "false",
-
-                duration: Number(
-                    req.body.duration || 0
-                ),
-ownerType: "creator",
-
-mediaType: req.body.type || "video",
-
-                brandCollection:
-                    req.body.brandCollection || "",
-
-                fileUrl:
-                    bunnyVideo.fileUrl,
-
-                storageProvider:
-                    "bunny",
-
-                storageKey:
-                    bunnyVideo.fileName,
-
-                previewUrl:
-                    bunnyPreview.fileUrl,
-
-                previewStorageKey:
-                    bunnyPreview.fileName,
-
-                thumbnail:
-                    thumb.secure_url,
-
-                thumbnailCloudinaryId:
-                    thumb.public_id,
-
-                taggedCreators:
-                    req.body.taggedCreators
-                        ? JSON.parse(
-                              req.body.taggedCreators
-                          )
-                        : [],
-
-                approvedCollaborators: [],
-
-                protection:
-                    req.body.protection
-                        ? JSON.parse(
-                              req.body.protection
-                          )
-                        : {},
-            });
-
-        return res.status(201).json({
-            success: true,
-            message:
-                "Content uploaded successfully.",
-            content,
-        });
-
-    } catch (error) {
-
-        console.error(error);
-
-        return res.status(500).json({
-            success: false,
-            error: error.message,
-        });
-
+    if (!video) {
+      return res.status(400).json({
+        success: false,
+        error: "Video is required.",
+      });
     }
+
+    if (!preview) {
+      return res.status(400).json({
+        success: false,
+        error: "Preview video is required.",
+      });
+    }
+
+    if (!thumbnail) {
+      return res.status(400).json({
+        success: false,
+        error: "Thumbnail is required.",
+      });
+    }
+
+    if (!req.body.title?.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Title is required.",
+      });
+    }
+
+    /*
+    --------------------------------
+    PARSE EXTERNAL MODELS
+    --------------------------------
+    */
+
+    let externalModels = [];
+
+    try {
+      externalModels = req.body.externalModels
+        ? JSON.parse(req.body.externalModels)
+        : [];
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid external models data.",
+      });
+    }
+
+    /*
+    --------------------------------
+    VALIDATE EXTERNAL MODEL CONSENTS
+    --------------------------------
+    */
+
+    for (const model of externalModels) {
+      const consentFile = consentFiles.find(
+        (file) =>
+          file.fieldname ===
+          `consent_${model.id}`
+      );
+
+      if (!consentFile) {
+        return res.status(400).json({
+          success: false,
+          error: `Signed consent form is required for ${model.fullName}.`,
+        });
+      }
+    }
+
+    /*
+    --------------------------------
+    UPLOAD FULL VIDEO TO BUNNY
+    --------------------------------
+    */
+
+    const videoExtension = path.extname(
+      video.originalname
+    );
+
+    const videoName =
+      `${uuid()}${videoExtension}`;
+
+    const bunnyVideo =
+      await uploadToBunny(
+        video.path,
+        videoName
+      );
+
+    /*
+    --------------------------------
+    UPLOAD PREVIEW TO BUNNY
+    --------------------------------
+    */
+
+    const previewExtension =
+      path.extname(
+        preview.originalname
+      );
+
+    const previewName =
+      `${uuid()}${previewExtension}`;
+
+    const bunnyPreview =
+      await uploadToBunny(
+        preview.path,
+        previewName
+      );
+
+    /*
+    --------------------------------
+    UPLOAD THUMBNAIL TO CLOUDINARY
+    --------------------------------
+    */
+
+    const thumb =
+      await cloudinary.uploader.upload(
+        thumbnail.path,
+        {
+          folder:
+            "bryson-tyler/thumbnails",
+          resource_type: "image",
+        }
+      );
+
+      /*
+--------------------------------
+UPLOAD CONSENT FORMS TO CLOUDINARY
+--------------------------------
+*/
+
+const uploadedConsents = {};
+
+for (const model of externalModels) {
+
+  const consentFile =
+    consentFiles.find(
+      (file) =>
+        file.fieldname ===
+        `consent_${model.id}`
+    );
+
+  if (!consentFile) {
+    continue;
+  }
+
+  const consentUpload =
+    await cloudinary.uploader.upload(
+      consentFile.path,
+      {
+        folder:
+          "bryson-tyler/consent-forms",
+
+        resource_type:
+          "auto",
+
+        type:
+          "upload",
+      }
+    );
+
+  uploadedConsents[model.id] = {
+    url:
+      consentUpload.secure_url,
+
+    publicId:
+      consentUpload.public_id,
+
+    originalName:
+      consentFile.originalname,
+  };
+}
+
+    /*
+    --------------------------------
+    CREATE CONTENT
+    --------------------------------
+    */
+
+    const content =
+      await Content.create({
+        creatorId:
+          req.user._id,
+
+        title:
+          req.body.title.trim(),
+
+        description:
+          req.body.description || "",
+
+        category:
+          req.body.category ||
+          "General",
+
+        tags:
+          req.body.tags
+            ? JSON.parse(req.body.tags)
+            : [],
+
+        visibility:
+          req.body.visibility ||
+          "free",
+
+        membership:
+          req.body.membership ||
+          "free",
+
+        price:
+          Number(
+            req.body.price || 0
+          ),
+
+        releaseDate:
+          req.body.releaseDate ||
+          null,
+
+        status:
+          "pending_review",
+
+        featured:
+          req.body.featured ===
+          "true",
+
+        allowComments:
+          req.body.allowComments !==
+          "false",
+
+        ownerType:
+          "creator",
+
+        mediaType:
+          req.body.mediaType ||
+          "video",
+
+        fileUrl:
+          bunnyVideo.fileUrl,
+
+        storageProvider:
+          "bunny",
+
+        storageKey:
+          bunnyVideo.fileName,
+
+        previewUrl:
+          bunnyPreview.fileUrl,
+
+        previewStorageKey:
+          bunnyPreview.fileName,
+
+        thumbnail:
+          thumb.secure_url,
+
+        taggedCreators:
+          req.body.taggedCreators
+            ? JSON.parse(
+                req.body.taggedCreators
+              )
+            : [],
+
+        approvedCollaborators:
+          [],
+
+        consentRequired:
+          externalModels.length > 0,
+
+        participantConsentStatus:
+          externalModels.length > 0
+            ? "pending"
+            : "not_required",
+
+        protection:
+          req.body.protection
+            ? JSON.parse(
+                req.body.protection
+              )
+            : {},
+      });
+
+    /*
+    --------------------------------
+    CREATE EXTERNAL PARTICIPANTS
+    AND UPLOAD CONSENT FORMS
+    --------------------------------
+    */
+
+    for (
+      const model of externalModels
+    ) {
+      const consentFile =
+        consentFiles.find(
+          (file) =>
+            file.fieldname ===
+            `consent_${model.id}`
+        );
+
+      if (!consentFile) {
+        continue;
+      }
+
+      /*
+      --------------------------------
+      UPLOAD CONSENT FORM TO CLOUDINARY
+      --------------------------------
+
+      auto resource_type allows:
+      PDF
+      JPG
+      JPEG
+      PNG
+      */
+
+      const consentUpload =
+        await cloudinary.uploader.upload(
+          consentFile.path,
+          {
+            folder:
+              "bryson-tyler/consent-forms",
+
+            resource_type:
+              "auto",
+
+            type:
+              "upload",
+
+            use_filename:
+              false,
+
+            unique_filename:
+              true,
+          }
+        );
+
+      console.log(
+        "CONSENT UPLOADED:",
+        consentUpload
+      );
+
+      /*
+      --------------------------------
+      CREATE PARTICIPANT
+      --------------------------------
+      */
+
+      await ContentParticipant.create({
+        contentId:
+          content._id,
+
+        submittedBy:
+          req.user._id,
+
+        fullName:
+          model.fullName,
+
+        email:
+          model.email || "",
+
+        participantType:
+          "external_model",
+
+        consentStatus:
+          "uploaded",
+
+        consentDocumentUrl:
+          consentUpload.secure_url,
+
+        consentCloudinaryId:
+          consentUpload.public_id,
+
+        consentDocumentName:
+          consentFile.originalname,
+
+        consentUploadedAt:
+          new Date(),
+      });
+    }
+
+    /*
+    --------------------------------
+    NOTIFICATION
+    --------------------------------
+    */
+
+    await createNotification({
+      recipient:
+        req.user._id,
+
+      type:
+        "creator_content_uploaded",
+
+      title:
+        "Content Submitted",
+
+      message:
+        `Your content "${content.title}" has been submitted for review.`,
+
+      link:
+        "/dashboard/content",
+    });
+
+    /*
+    --------------------------------
+    DELETE TEMPORARY MULTER FILES
+    --------------------------------
+    */
+
+    const filesToDelete =
+      req.files || [];
+
+    for (
+      const file of filesToDelete
+    ) {
+      if (
+        file.path &&
+        fs.existsSync(file.path)
+      ) {
+        fs.unlinkSync(
+          file.path
+        );
+      }
+    }
+
+    /*
+    --------------------------------
+    RESPONSE
+    --------------------------------
+    */
+
+    return res.status(201).json({
+      success: true,
+
+      message:
+        "Content uploaded successfully.",
+
+      content,
+    });
+
+  } catch (error) {
+    console.error(
+      "UPLOAD CONTENT ERROR:",
+      error
+    );
+
+    /*
+    --------------------------------
+    CLEAN TEMP FILES ON ERROR TOO
+    --------------------------------
+    */
+
+    try {
+      const filesToDelete =
+        req.files || [];
+
+      for (
+        const file of filesToDelete
+      ) {
+        if (
+          file.path &&
+          fs.existsSync(file.path)
+        ) {
+          fs.unlinkSync(
+            file.path
+          );
+        }
+      }
+    } catch (cleanupError) {
+      console.error(
+        "FILE CLEANUP ERROR:",
+        cleanupError
+      );
+    }
+
+    return res.status(500).json({
+      success: false,
+
+      error:
+        error.message ||
+        "Content upload failed.",
+    });
+  }
 };
 
 exports.getMyContent = async (req, res) => {

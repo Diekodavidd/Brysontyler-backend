@@ -437,21 +437,27 @@ exports.paymentWebhook = async (
           payment.coinPurchase.quantity;
         break;
 
-      case "membership":
-        user.membership = {
-          plan: payment.membershipPlan,
-          status: "active",
-          startDate: new Date(),
-          endDate: new Date(
-            Date.now() +
-              30 *
-                24 *
-                60 *
-                60 *
-                1000
-          ),
-        };
-        break;
+      case "membership": {
+  user.membership = {
+    plan: payment.membershipPlan,
+    status: "active",
+    startDate: new Date(),
+    endDate: new Date(
+      Date.now() +
+        30 * 24 * 60 * 60 * 1000
+    ),
+  };
+
+  await createNotification({
+    recipient: user._id,
+    type: "membership_upgraded",
+    title: "Membership Upgraded",
+    message: `Your ${payment.membershipPlan} membership is now active.`,
+    link: "/dashboard/membership",
+  });
+
+  break;
+}
 
       case "subscription": {
         let sub =

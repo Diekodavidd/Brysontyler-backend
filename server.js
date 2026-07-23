@@ -43,6 +43,10 @@ app.use(
     require("./src_/routes_/membershipRoutes")
 );
 
+app.use(
+  "/notifications",require('./src_/routes_/notificationRoutes')
+  
+);
 
 const {
   verifyEmailConnection,
