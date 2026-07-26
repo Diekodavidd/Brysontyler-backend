@@ -621,120 +621,255 @@ exports.getContentById = async (req, res) => {
     }
 };
 
+
 exports.updateContent = async (req, res) => {
-    try {
+  try {
+    const content = await Content.findById(req.params.id);
 
-        const content = await Content.findById(req.params.id);
-
-        if (!content) {
-            return res.status(404).json({
-                error: "Content not found.",
-            });
-        }
-
-        if (
-            content.creatorId.toString() !==
-            req.user._id.toString()
-        ) {
-            return res.status(403).json({
-                error: "Unauthorized.",
-            });
-        }
-
-        if (req.body.title)
-            content.title = req.body.title.trim();
-
-        if (req.body.description)
-            content.description = req.body.description;
-
-        if (req.body.category)
-            content.category = req.body.category;
-
-        if (req.body.visibility)
-            content.visibility = req.body.visibility;
-
-        if (req.body.price)
-            content.price = req.body.price;
-
-        if (req.body.releaseDate)
-            content.releaseDate =
-                req.body.releaseDate;
-
-        if (req.body.releaseTime)
-            content.releaseTime =
-                req.body.releaseTime;
-
-        if (req.body.tags)
-            content.tags = req.body.tags;
-
-        await content.save();
-
-        res.json({
-            success: true,
-            content,
-        });
-
-    } catch (error) {
-
-        res.status(500).json({
-            error: error.message,
-        });
-
+    if (!content) {
+      return res.status(404).json({
+        success: false,
+        error: "Content not found.",
+      });
     }
+
+    // Make sure the creator owns this content
+    if (
+      content.creatorId.toString() !==
+      req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: "Unauthorized.",
+      });
+    }
+
+    // ==============================
+    // UPDATE FIELDS
+    // ==============================
+
+    if (req.body.title !== undefined) {
+      content.title =
+        req.body.title.trim();
+    }
+
+    if (req.body.description !== undefined) {
+      content.description =
+        req.body.description;
+    }
+
+    if (req.body.category !== undefined) {
+      content.category =
+        req.body.category;
+    }
+
+    if (req.body.visibility !== undefined) {
+      content.visibility =
+        req.body.visibility;
+    }
+
+    if (req.body.price !== undefined) {
+      content.price =
+        Number(req.body.price) || 0;
+    }
+
+    if (req.body.releaseDate !== undefined) {
+      content.releaseDate =
+        req.body.releaseDate;
+    }
+
+    if (req.body.releaseTime !== undefined) {
+      content.releaseTime =
+        req.body.releaseTime;
+    }
+
+    if (req.body.tags !== undefined) {
+      // If tags are sent as JSON string
+      if (typeof req.body.tags === "string") {
+        try {
+          content.tags =
+            JSON.parse(req.body.tags);
+        } catch {
+          content.tags =
+            req.body.tags
+              .split(",")
+              .map((tag) => tag.trim())
+              .filter(Boolean);
+        }
+      } else {
+        content.tags =
+          req.body.tags;
+      }
+    }
+
+    await content.save();
+
+    return res.json({
+      success: true,
+      message: "Content updated successfully.",
+      content,
+    });
+
+  } catch (error) {
+    console.error(
+      "UPDATE CONTENT ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      error:
+        error.message ||
+        "Failed to update content.",
+    });
+  }
 };
+
 
 exports.deleteContent = async (req, res) => {
-    try {
+  try {
+    const content =
+      await Content.findById(req.params.id);
 
-        const content = await Content.findById(req.params.id);
+    if (!content) {
+      return res.status(404).json({
+        success: false,
+        error: "Content not found.",
+      });
+    }
 
-        if (!content) {
-            return res.status(404).json({
-                error: "Content not found.",
-            });
-        }
+    // ==============================
+    // CHECK OWNERSHIP
+    // ==============================
 
-        if (
-            content.creatorId.toString() !==
-            req.user._id.toString()
-        ) {
-            return res.status(403).json({
-                error: "Unauthorized.",
-            });
-        }
+    if (
+      content.creatorId.toString() !==
+      req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        error: "Unauthorized.",
+      });
+    }
 
+    // ==============================
+    // DELETE VIDEO FROM BUNNY
+    // ==============================
+
+    if (
+      content.mediaType?.toLowerCase() ===
+        "video" &&
+      content.storageKey
+    ) {
+      try {
         await axios.delete(
-            `${process.env.BUNNY_STORAGE_HOST}/${process.env.BUNNY_STORAGE_ZONE}/${content.storageKey}`,
-            {
-                headers: {
-                    AccessKey:
-                        process.env.BUNNY_STORAGE_PASSWORD,
-                },
-            }
+          `${process.env.BUNNY_STORAGE_HOST}/${process.env.BUNNY_STORAGE_ZONE}/${content.storageKey}`,
+          {
+            headers: {
+              AccessKey:
+                process.env.BUNNY_STORAGE_PASSWORD,
+            },
+          }
         );
 
-        if (content.thumbnailCloudinaryId) {
-            await cloudinary.uploader.destroy(
-                content.thumbnailCloudinaryId
-            );
+        console.log(
+          "Bunny video deleted:",
+          content.storageKey
+        );
+
+      } catch (bunnyError) {
+        console.error(
+          "BUNNY VIDEO DELETE ERROR:",
+          bunnyError.response?.data ||
+            bunnyError.message
+        );
+      }
+    }
+
+    // ==============================
+    // DELETE IMAGE COLLECTION
+    // ==============================
+
+    if (
+      content.mediaType?.toLowerCase() ===
+        "image" &&
+      Array.isArray(content.images)
+    ) {
+      for (const image of content.images) {
+        if (!image.storageKey) {
+          continue;
         }
 
-        await content.deleteOne();
+        try {
+          await axios.delete(
+            `${process.env.BUNNY_STORAGE_HOST}/${process.env.BUNNY_STORAGE_ZONE}/${image.storageKey}`,
+            {
+              headers: {
+                AccessKey:
+                  process.env.BUNNY_STORAGE_PASSWORD,
+              },
+            }
+          );
 
-        res.json({
-            success: true,
-            message: "Content deleted successfully.",
-        });
+          console.log(
+            "Bunny image deleted:",
+            image.storageKey
+          );
 
-    } catch (error) {
-
-        res.status(500).json({
-            error: error.message,
-        });
-
+        } catch (bunnyError) {
+          console.error(
+            "BUNNY IMAGE DELETE ERROR:",
+            image.storageKey,
+            bunnyError.response?.data ||
+              bunnyError.message
+          );
+        }
+      }
     }
-};
 
+    // ==============================
+    // DELETE OLD CLOUDINARY THUMBNAIL
+    // ==============================
+
+    if (content.thumbnailCloudinaryId) {
+      try {
+        await cloudinary.uploader.destroy(
+          content.thumbnailCloudinaryId
+        );
+      } catch (cloudinaryError) {
+        console.error(
+          "CLOUDINARY THUMBNAIL DELETE ERROR:",
+          cloudinaryError.message
+        );
+      }
+    }
+
+    // ==============================
+    // DELETE DATABASE RECORD
+    // ==============================
+
+    await content.deleteOne();
+
+    return res.json({
+      success: true,
+      message:
+        "Content deleted successfully.",
+    });
+
+  } catch (error) {
+    console.error(
+      "DELETE CONTENT ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      error:
+        error.message ||
+        "Failed to delete content.",
+    });
+  }
+};
 exports.searchContent = async (req, res) => {
     try {
 
@@ -1002,27 +1137,38 @@ exports.uploadBrandContent = async (req, res) => {
 
 exports.getGallery = async (req, res) => {
     try {
-
-        const videos = await Content.find({
+        const content = await Content.find({
             status: "published",
-            type: "brand",
+            $or: [
+                {
+                    ownerType: "brand",
+                },
+                {
+                    type: "brand",
+                },
+            ],
         })
-        .sort({ createdAt: -1 });
+        .sort({
+            createdAt: -1,
+        });
 
         res.json({
             success: true,
-            videos,
+            content,
         });
 
     } catch (err) {
+        console.error(
+            "GET GALLERY ERROR:",
+            err
+        );
 
         res.status(500).json({
+            success: false,
             error: err.message,
         });
-
     }
 };
-
 exports.watchContent = async (req, res) => {
     try {
 
@@ -1299,6 +1445,260 @@ exports.deleteBrandVideo = async (req, res) => {
     return res.status(500).json({
       success: false,
       error: err.message,
+    });
+  }
+};
+
+exports.uploadBrandGallery = async (req, res) => {
+  try {
+    const images = req.files || [];
+
+    if (!images.length) {
+      return res.status(400).json({
+        success: false,
+        error: "At least one image is required.",
+      });
+    }
+
+    if (!req.body.title?.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Title is required.",
+      });
+    }
+
+    const uploadedImages = [];
+
+    for (const image of images) {
+      const extension = path.extname(
+        image.originalname
+      );
+
+      const fileName =
+        `gallery/${uuid()}${extension}`;
+
+      const bunnyImage =
+        await uploadToBunny(
+          image.path,
+          fileName
+        );
+
+      uploadedImages.push({
+        url: bunnyImage.fileUrl,
+
+        storageKey:
+          bunnyImage.fileName,
+
+        storageProvider:
+          "bunny",
+      });
+    }
+
+    const content =
+      await Content.create({
+
+        creatorId:
+          req.user._id,
+
+        title:
+          req.body.title.trim(),
+
+        description:
+          req.body.description || "",
+
+        category:
+          req.body.category ||
+          "General",
+
+        tags:
+          req.body.tags
+            ? JSON.parse(req.body.tags)
+            : [],
+
+        visibility:
+          req.body.visibility ||
+          "free",
+
+        membership:
+          req.body.membership ||
+          "free",
+
+        price:
+          Number(
+            req.body.price || 0
+          ),
+
+        ownerType:
+          "brand",
+
+        mediaType:
+          "image",
+
+        images:
+          uploadedImages,
+
+        status:
+          "published",
+
+        featured:
+          req.body.featured ===
+          "true",
+
+        allowComments:
+          req.body.allowComments !==
+          "false",
+
+        brandCollection:
+          req.body.brandCollection ||
+          "Bryson Tyler Originals",
+
+        protection:
+          req.body.protection
+            ? JSON.parse(
+                req.body.protection
+              )
+            : {},
+      });
+
+    await deleteCacheByPattern(
+      CACHE_KEYS.BRAND_GALLERY
+    );
+
+    return res.status(201).json({
+      success: true,
+
+      message:
+        "Gallery images uploaded successfully.",
+
+      content,
+    });
+
+  } catch (error) {
+
+    console.error(
+      "UPLOAD BRAND GALLERY ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+
+      error:
+        error.message ||
+        "Gallery upload failed.",
+    });
+  }
+};
+
+exports.uploadCreatorImages = async (req, res) => {
+  try {
+    const images = req.files || [];
+
+    if (!images.length) {
+      return res.status(400).json({
+        success: false,
+        error: "At least one image is required.",
+      });
+    }
+
+    if (!req.body.title?.trim()) {
+      return res.status(400).json({
+        success: false,
+        error: "Title is required.",
+      });
+    }
+
+    const uploadedImages = [];
+
+    for (const image of images) {
+      const extension = path.extname(
+        image.originalname
+      );
+
+      const fileName =
+        `creator-images/${uuid()}${extension}`;
+
+      // Upload to Bunny
+      const bunnyImage = await uploadToBunny(
+        image.path,
+        fileName
+      );
+
+      // IMPORTANT:
+      // Map Bunny response fields to your
+      // Content schema fields.
+      uploadedImages.push({
+        url: bunnyImage.fileUrl,
+
+        storageKey:
+          bunnyImage.fileName,
+
+        storageProvider:
+          "bunny",
+      });
+    }
+
+    const content = await Content.create({
+      creatorId: req.user._id,
+
+      title: req.body.title.trim(),
+
+      description:
+        req.body.description || "",
+
+      category:
+        req.body.category || "General",
+
+      tags: req.body.tags
+        ? JSON.parse(req.body.tags)
+        : [],
+
+      visibility:
+        req.body.visibility || "free",
+
+      price:
+        Number(req.body.price || 0),
+
+      ownerType:
+        "creator",
+
+      mediaType:
+        "image",
+
+      images:
+        uploadedImages,
+
+      status:
+        "published",
+
+      featured:
+        req.body.featured === "true",
+
+      allowComments:
+        req.body.allowComments !== "false",
+    });
+
+    return res.status(201).json({
+      success: true,
+
+      message:
+        "Images uploaded successfully.",
+
+      content,
+    });
+
+  } catch (error) {
+    console.error(
+      "UPLOAD CREATOR IMAGES ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+
+      error:
+        error.message ||
+        "Image upload failed.",
     });
   }
 };

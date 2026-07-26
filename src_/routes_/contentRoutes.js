@@ -22,11 +22,11 @@ const {
     deleteContent,
     searchContent,
     getBrandGallery,
-    deleteBrandVideo,
+    deleteBrandVideo,uploadBrandGallery,uploadCreatorImages,
 } = require("../controllers_/contentController");
 
 /* =====================================================
-   CREATOR CONTENT
+   CREATOR VIDEO CONTENT
 ===================================================== */
 
 router.post(
@@ -34,6 +34,17 @@ router.post(
   auth,
   upload.any(),
   uploadContent
+);
+
+/* =====================================================
+   CREATOR IMAGE CONTENT
+===================================================== */
+
+router.post(
+  "/upload-images",
+  auth,
+  upload.array("images", 20),
+  uploadCreatorImages
 );
 
 /* =====================================================
@@ -60,7 +71,13 @@ router.post(
     ]),
     uploadBrandContent
 );
-
+router.post(
+  "/upload-brand-gallery",
+  auth,
+  role(["admin"]),
+  upload.array("images", 20),
+  uploadBrandGallery
+);
 router.get(
     "/brand",
      auth,

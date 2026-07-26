@@ -12,10 +12,7 @@ const ContentSchema = new mongoose.Schema({
     default: "",
   },
 
-  fileUrl: {
-    type: String,
-    required: true,
-  },
+
 
   thumbnail: {
     type: String,
@@ -47,10 +44,51 @@ ownerType: {
 },
 
 mediaType: {
-    type: String,
-    enum: ["video", "image"],
-    default: "video",
+  type: String,
+  enum: ["video", "image"],
+  default: "video",
 },
+
+fileUrl: {
+  type: String,
+  default: "",
+},
+
+storageProvider: {
+  type: String,
+  enum: ["bunny", "cloudinary"],
+  default: "bunny",
+},
+
+storageKey: {
+  type: String,
+  default: "",
+},
+
+images: [
+  {
+    url: {
+      type: String,
+      required: true,
+    },
+
+    storageKey: {
+      type: String,
+      required: true,
+    },
+
+    storageProvider: {
+      type: String,
+      enum: ["cloudinary", "bunny"],
+      default: "cloudinary",
+    },
+
+    cloudinaryId: {
+      type: String,
+      default: "",
+    },
+  },
+],
 
 brandCollection: {
     type: String,
@@ -72,15 +110,7 @@ views: {
     type: Number,
     default: 0,
 },
-  storageProvider:{
-    type:String,
-    default:"bunny"
-},
 
-storageKey:{
-    type:String,
-    required:true
-},
 
   creatorId: {
     type: mongoose.Schema.Types.ObjectId,
