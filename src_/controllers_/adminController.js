@@ -1,6 +1,9 @@
 const User = require("../models_/user");
 const Content = require("../models_/content");
 const Subscription = require("../models_/subscription");
+const Payment = require("../models_/payment");
+const Membership = require("../models_/membership");
+const Payout = require("../models_/payouts");
 
 const createNotification = require("../utils_/createNotification");
 
@@ -2009,4 +2012,805 @@ exports.getReviewedContent = async (req, res) => {
 
   }
 
+};
+
+// ============================================================
+// GET ALL PAYOUT REQUESTS
+// ============================================================
+
+exports.getAllPayouts = async (req, res) => {
+  try {
+    const payouts = await Payout.find()
+      .populate(
+        "creatorId",
+        "name email profileImage"
+      )
+      .populate(
+        "processedBy",
+        "name email"
+      )
+      .sort({
+        createdAt: -1,
+      })
+      .lean();
+
+    return res.json({
+      success: true,
+      count: payouts.length,
+      payouts,
+    });
+
+  } catch (err) {
+    console.error(
+      "GET ALL PAYOUTS ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+// ============================================================
+// GET PAYOUT STATS
+// ============================================================
+
+exports.getPayoutStats = async (req, res) => {
+  try {
+    const [
+      totalRequests,
+      pending,
+      approved,
+      processing,
+      paid,
+      declined,
+    ] = await Promise.all([
+      Payout.countDocuments(),
+
+      Payout.countDocuments({
+        status: "pending",
+      }),
+
+      Payout.countDocuments({
+        status: "approved",
+      }),
+
+      Payout.countDocuments({
+        status: "processing",
+      }),
+
+      Payout.countDocuments({
+        status: "paid",
+      }),
+
+      Payout.countDocuments({
+        status: "declined",
+      }),
+    ]);
+
+    const amountStats =
+      await Payout.aggregate([
+        {
+          $group: {
+            _id: null,
+
+            totalRequested: {
+              $sum: "$amount",
+            },
+
+            totalPaid: {
+              $sum: {
+                $cond: [
+                  {
+                    $eq: [
+                      "$status",
+                      "paid",
+                    ],
+                  },
+                  "$amount",
+                  0,
+                ],
+              },
+            },
+
+            totalPending: {
+              $sum: {
+                $cond: [
+                  {
+                    $eq: [
+                      "$status",
+                      "pending",
+                    ],
+                  },
+                  "$amount",
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ]);
+
+    const amounts =
+      amountStats[0] || {
+        totalRequested: 0,
+        totalPaid: 0,
+        totalPending: 0,
+      };
+
+    return res.json({
+      success: true,
+
+      stats: {
+        totalRequests,
+        pending,
+        approved,
+        processing,
+        paid,
+        declined,
+
+        totalRequested:
+          amounts.totalRequested,
+
+        totalPaid:
+          amounts.totalPaid,
+
+        totalPending:
+          amounts.totalPending,
+      },
+    });
+
+  } catch (err) {
+    console.error(
+      "GET PAYOUT STATS ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+// ============================================================
+// APPROVE PAYOUT
+// ============================================================
+
+exports.approvePayout = async (req, res) => {
+  try {
+    const payout =
+      await Payout.findById(
+        req.params.id
+      );
+
+    if (!payout) {
+      return res.status(404).json({
+        success: false,
+        error: "Payout request not found.",
+      });
+    }
+
+    if (
+      payout.status !== "pending"
+    ) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Only pending payouts can be approved.",
+      });
+    }
+
+    payout.status = "approved";
+
+    payout.processedBy =
+      req.user?._id || null;
+
+    payout.processedAt =
+      new Date();
+
+    await payout.save();
+
+    return res.json({
+      success: true,
+      message:
+        "Payout approved successfully.",
+      payout,
+    });
+
+  } catch (err) {
+    console.error(
+      "APPROVE PAYOUT ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+// ============================================================
+// DECLINE PAYOUT
+// ============================================================
+
+exports.declinePayout = async (req, res) => {
+  try {
+    const payout =
+      await Payout.findById(
+        req.params.id
+      );
+
+    if (!payout) {
+      return res.status(404).json({
+        success: false,
+        error: "Payout request not found.",
+      });
+    }
+
+    if (
+      payout.status !== "pending"
+    ) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Only pending payouts can be declined.",
+      });
+    }
+
+    const reason =
+      req.body.reason || "";
+
+    payout.status = "declined";
+
+    payout.rejectionReason =
+      reason;
+
+    payout.processedBy =
+      req.user?._id || null;
+
+    payout.processedAt =
+      new Date();
+
+    await payout.save();
+
+    return res.json({
+      success: true,
+      message:
+        "Payout declined successfully.",
+      payout,
+    });
+
+  } catch (err) {
+    console.error(
+      "DECLINE PAYOUT ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+// ============================================================
+// MARK PAYOUT AS PROCESSING
+// ============================================================
+
+exports.processPayout = async (req, res) => {
+  try {
+    const payout =
+      await Payout.findById(
+        req.params.id
+      );
+
+    if (!payout) {
+      return res.status(404).json({
+        success: false,
+        error: "Payout request not found.",
+      });
+    }
+
+    if (
+      payout.status !== "approved"
+    ) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Only approved payouts can be processed.",
+      });
+    }
+
+    payout.status =
+      "processing";
+
+    await payout.save();
+
+    return res.json({
+      success: true,
+      message:
+        "Payout is now being processed.",
+      payout,
+    });
+
+  } catch (err) {
+    console.error(
+      "PROCESS PAYOUT ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+// ============================================================
+// MARK PAYOUT AS PAID
+// ============================================================
+
+exports.completePayout = async (req, res) => {
+  try {
+    const payout =
+      await Payout.findById(
+        req.params.id
+      );
+
+    if (!payout) {
+      return res.status(404).json({
+        success: false,
+        error: "Payout request not found.",
+      });
+    }
+
+    if (
+      ![
+        "approved",
+        "processing",
+      ].includes(payout.status)
+    ) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "Only approved or processing payouts can be marked as paid.",
+      });
+    }
+
+    payout.status = "paid";
+
+    payout.transactionId =
+      req.body.transactionId ||
+      payout.transactionId ||
+      "";
+
+    payout.processedBy =
+      req.user?._id || null;
+
+    payout.processedAt =
+      new Date();
+
+    await payout.save();
+
+    return res.json({
+      success: true,
+      message:
+        "Payout marked as paid.",
+      payout,
+    });
+
+  } catch (err) {
+    console.error(
+      "COMPLETE PAYOUT ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
+  }
+};
+
+// ============================================================
+// GET ADMIN REPORTS
+// ============================================================
+
+
+exports.getAdminReports = async (req, res) => {
+  try {
+    const range = Math.max(
+      Number(req.query.range) || 30,
+      1
+    );
+
+    const now = new Date();
+
+    const startDate = new Date(now);
+
+    if (range === 365) {
+      startDate.setFullYear(
+        now.getFullYear() - 1
+      );
+    } else {
+      startDate.setDate(
+        now.getDate() - range
+      );
+    }
+
+    // Previous period
+    const previousStartDate = new Date(
+      startDate
+    );
+
+    previousStartDate.setDate(
+      previousStartDate.getDate() - range
+    );
+
+    // ============================================================
+    // BASIC COUNTS
+    // ============================================================
+
+    const [
+      totalUsers,
+      totalCreators,
+      totalFans,
+      publishedVideos,
+      totalVideoViews,
+      newUsers,
+      newPublishedVideos,
+      activeMemberships,
+    ] = await Promise.all([
+
+      User.countDocuments(),
+
+      User.countDocuments({
+        role: "creator",
+      }),
+
+      User.countDocuments({
+        role: "fan",
+      }),
+
+      Content.countDocuments({
+        status: "published",
+        mediaType: "video",
+      }),
+
+      Content.aggregate([
+        {
+          $match: {
+            mediaType: "video",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            total: {
+              $sum: "$views",
+            },
+          },
+        },
+      ]),
+
+      User.countDocuments({
+        createdAt: {
+          $gte: startDate,
+        },
+      }),
+
+      Content.countDocuments({
+        status: "published",
+        mediaType: "video",
+        createdAt: {
+          $gte: startDate,
+        },
+      }),
+
+      Membership.countDocuments({
+        status: "active",
+      }),
+
+    ]);
+
+    // ============================================================
+    // REVENUE
+    // ============================================================
+
+    const revenueResult =
+      await Payment.aggregate([
+        {
+          $match: {
+            completed: true,
+
+            createdAt: {
+              $gte: startDate,
+            },
+          },
+        },
+
+        {
+          $group: {
+            _id: null,
+
+            total: {
+              $sum: "$amount",
+            },
+          },
+        },
+      ]);
+
+    const platformRevenue =
+      revenueResult[0]?.total || 0;
+
+    // ============================================================
+    // PREVIOUS PERIOD REVENUE
+    // ============================================================
+
+    const previousRevenueResult =
+      await Payment.aggregate([
+        {
+          $match: {
+            completed: true,
+
+            createdAt: {
+              $gte: previousStartDate,
+              $lt: startDate,
+            },
+          },
+        },
+
+        {
+          $group: {
+            _id: null,
+
+            total: {
+              $sum: "$amount",
+            },
+          },
+        },
+      ]);
+
+    const previousRevenue =
+      previousRevenueResult[0]?.total || 0;
+
+    let revenueChange = 0;
+
+    if (previousRevenue > 0) {
+      revenueChange =
+        (
+          (
+            platformRevenue -
+            previousRevenue
+          ) /
+          previousRevenue
+        ) *
+        100;
+    }
+
+    revenueChange =
+      Number(
+        revenueChange.toFixed(1)
+      );
+
+    // ============================================================
+    // VIDEO VIEWS
+    // ============================================================
+
+    const videoViews =
+      totalVideoViews[0]?.total || 0;
+
+    // ============================================================
+    // TOP CREATORS
+    // ============================================================
+
+    const topCreators =
+      await Content.aggregate([
+
+        {
+          $match: {
+            ownerType: "creator",
+            status: "published",
+          },
+        },
+
+        {
+          $group: {
+            _id: "$creatorId",
+
+            videos: {
+              $sum: 1,
+            },
+
+            views: {
+              $sum: "$views",
+            },
+          },
+        },
+
+        {
+          $lookup: {
+            from: "users",
+            localField: "_id",
+            foreignField: "_id",
+            as: "creator",
+          },
+        },
+
+        {
+          $unwind: {
+            path: "$creator",
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+
+        {
+          $project: {
+            _id: 0,
+
+            name: {
+              $ifNull: [
+                "$creator.name",
+                "Unknown Creator",
+              ],
+            },
+
+            videos: 1,
+
+            views: 1,
+          },
+        },
+
+        {
+          $sort: {
+            views: -1,
+          },
+        },
+
+        {
+          $limit: 10,
+        },
+
+      ]);
+
+    // ============================================================
+    // REVENUE CHART
+    // ============================================================
+
+    const revenueChart =
+      await Payment.aggregate([
+
+        {
+          $match: {
+            completed: true,
+
+            createdAt: {
+              $gte: startDate,
+            },
+          },
+        },
+
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: "%Y-%m-%d",
+                date: "$createdAt",
+              },
+            },
+
+            revenue: {
+              $sum: "$amount",
+            },
+          },
+        },
+
+        {
+          $sort: {
+            "_id": 1,
+          },
+        },
+
+      ]);
+
+    // ============================================================
+    // MEMBERSHIP GROWTH
+    // ============================================================
+
+    const membershipGrowth =
+      await Membership.aggregate([
+
+        {
+          $match: {
+            createdAt: {
+              $gte: startDate,
+            },
+          },
+        },
+
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: "%Y-%m-%d",
+                date: "$createdAt",
+              },
+            },
+
+            memberships: {
+              $sum: 1,
+            },
+          },
+        },
+
+        {
+          $sort: {
+            "_id": 1,
+          },
+        },
+
+      ]);
+
+    // ============================================================
+    // RESPONSE
+    // ============================================================
+
+    return res.json({
+
+      success: true,
+
+      range,
+
+      stats: {
+
+        platformRevenue,
+
+        revenueChange,
+
+        totalUsers,
+
+        totalCreators,
+
+        totalFans,
+
+        newUsers,
+
+        videoViews,
+
+        publishedVideos,
+
+        newPublishedVideos,
+
+        activeMemberships,
+
+      },
+
+      topCreators,
+
+      revenueChart,
+
+      membershipGrowth,
+
+    });
+
+  } catch (error) {
+
+    console.error(
+      "GET ADMIN REPORTS ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: error.message,
+
+    });
+
+  }
 };

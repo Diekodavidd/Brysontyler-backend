@@ -18,6 +18,15 @@ const {
     deleteUser,
     getReviewedContent,
 } = require("../controllers_/adminController");
+
+const {
+  getAllPayouts,
+  getPayoutStats,
+  approvePayout,
+  declinePayout,
+  processPayout,
+  completePayout,getReports,
+} = require("../controllers_/adminController");
 const auth = require('../middleware_/authMiddleware');
 const role = require('../middleware_/roleMiddleware');
 
@@ -52,7 +61,12 @@ router.patch(
     rejectCreator
 );
 
-
+router.get(
+  "/reports",
+  auth,
+  role(["admin"]),
+  getReports
+);
 
 router.get(
     "/creators/pending",
@@ -105,6 +119,52 @@ router.get(
   auth,
   role(["admin"]),
   getReviewedContent
+);
+
+// ============================================================
+// PAYOUTS
+// ============================================================
+
+router.get(
+  "/payouts",
+  auth,
+  role(["admin"]),
+  getAllPayouts
+);
+
+router.get(
+  "/payouts/stats",
+  auth,
+  role(["admin"]),
+  getPayoutStats
+);
+
+router.patch(
+  "/payouts/:id/approve",
+  auth,
+  role(["admin"]),
+  approvePayout
+);
+
+router.patch(
+  "/payouts/:id/decline",
+  auth,
+  role(["admin"]),
+  declinePayout
+);
+
+router.patch(
+  "/payouts/:id/process",
+  auth,
+  role(["admin"]),
+  processPayout
+);
+
+router.patch(
+  "/payouts/:id/complete",
+  auth,
+  role(["admin"]),
+  completePayout
 );
 module.exports = router;
 
