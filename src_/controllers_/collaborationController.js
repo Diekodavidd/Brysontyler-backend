@@ -380,26 +380,53 @@ exports.cancelCollaborationRequest = async (req, res) => {
     }
 };
 
+const redis = require("../config_/redis");
+
 exports.discoverCreators = async (req, res) => {
   try {
+    const cacheKey = "discover:creators";
+
+    // 1. Check Redis first
+    const cachedCreators = await redis.get(cacheKey);
+
+    if (cachedCreators) {
+      const creators = JSON.parse(cachedCreators);
+
+      return res.json({
+        success: true,
+        count: creators.length,
+        creators,
+        source: "cache",
+      });
+    }
+
+    // 2. Redis doesn't have the data
     const creators = await User.find({
       role: "creator",
-      _id: {
-        $ne: req.user._id,
-      },
+      _id: { $ne: req.user._id },
     })
       .select(
-        "_id name email profilePic bio creatorApplication isVerifiedCreator"
+        "name email profilePic bio creatorApplication isVerifiedCreator"
       )
       .sort({
         createdAt: -1,
       })
       .lean();
 
-    return res.status(200).json({
+    // 3. Save result in Redis
+    await redis.set(
+      cacheKey,
+      JSON.stringify(creators),
+      "EX",
+      300
+    );
+
+    // 4. Return result
+    return res.json({
       success: true,
       count: creators.length,
       creators,
+      source: "database",
     });
 
   } catch (error) {
@@ -408,7 +435,7 @@ exports.discoverCreators = async (req, res) => {
       error
     );
 
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       error: error.message,
     });

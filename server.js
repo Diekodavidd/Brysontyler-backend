@@ -48,6 +48,29 @@ app.use(
   
 );
 
+
+const redis = require("./src_/config_/redis");
+
+app.get("/test-redis", async (req, res) => {
+  try {
+    await redis.set("test", "Hello Redis");
+
+    const value = await redis.get("test");
+
+    res.json({
+      success: true,
+      value,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 const {
   verifyEmailConnection,
 } = require("./src_/services/emailService");

@@ -9,7 +9,22 @@ const createNotification = require("../utils_/createNotification");
 const ContentParticipant =
   require("../models_/contentparticipant");
 
+const {
+  getCache,
+  setCache,
+  deleteCacheByPattern,
+} = require("../utils_/cache");
 
+const CACHE_KEYS = {
+  CONTENT: "admin:content",
+  REVIEWED_CONTENT: "admin:reviewed-content",
+  BRAND_GALLERY: "content:brand-gallery",
+};
+
+
+const CACHE_TTL = {
+  LISTS: 60,
+};
 exports.uploadContent = async (req, res) => {
   try {
     console.log("=========== UPLOAD ===========");
@@ -747,201 +762,242 @@ exports.searchContent = async (req, res) => {
     }
 };
 
+// ============================================================
+// UPLOAD BRAND CONTENT
+// ============================================================
+
 exports.uploadBrandContent = async (req, res) => {
-   console.log("REQ.USER:", req.user);
-    try {
+  console.log("REQ.USER:", req.user);
 
-        const video = req.files?.video?.[0];
-        const preview = req.files?.preview?.[0];
-        const thumbnail = req.files?.thumbnail?.[0];
+  try {
+    const video = req.files?.video?.[0];
+    const preview = req.files?.preview?.[0];
+    const thumbnail = req.files?.thumbnail?.[0];
 
-        if (!video) {
-            return res.status(400).json({
-                error: "Video is required.",
-            });
-        }
+    // -----------------------------------------
+    // VALIDATION
+    // -----------------------------------------
 
-        if (!preview) {
-            return res.status(400).json({
-                error: "Preview video is required.",
-            });
-        }
-
-        if (!thumbnail) {
-            return res.status(400).json({
-                error: "Thumbnail is required.",
-            });
-        }
-
-        if (!req.body.title) {
-            return res.status(400).json({
-                error: "Title is required.",
-            });
-        }
-
-        /* -----------------------------
-           Upload Full Video
-        ----------------------------- */
-
-        const videoExtension = path.extname(
-            video.originalname
-        );
-
-        const videoName =
-            `${uuid()}${videoExtension}`;
-
-        const bunnyVideo =
-            await uploadToBunny(
-                video.path,
-                videoName
-            );
-
-        /* -----------------------------
-           Upload Preview
-        ----------------------------- */
-
-        const previewExtension = path.extname(
-            preview.originalname
-        );
-
-        const previewName =
-            `${uuid()}${previewExtension}`;
-
-        const bunnyPreview =
-            await uploadToBunny(
-                preview.path,
-                previewName
-            );
-
-        /* -----------------------------
-           Upload Thumbnail
-        ----------------------------- */
-
-        const thumb =
-            await cloudinary.uploader.upload(
-                thumbnail.path,
-                {
-                    folder:
-                        "bryson-tyler/thumbnails",
-                }
-            );
-
-        if (fs.existsSync(thumbnail.path)) {
-            fs.unlinkSync(thumbnail.path);
-        }
-
-        /* -----------------------------
-           Save Content
-        ----------------------------- */
-console.log("TYPE RECEIVED:", req.body.type);
-        const content =
-            await Content.create({
-
-                creatorId: req.user._id,
-
-                title: req.body.title.trim(),
-
-                description:
-                    req.body.description || "",
-
-                category:
-                    req.body.category || "General",
-
-                tags: req.body.tags
-                    ? JSON.parse(req.body.tags)
-                    : [],
-geoBlocking: req.body.geoBlocking
-    ? JSON.parse(req.body.geoBlocking)
-    : {
-          enabled: false,
-          blockedCountries: [],
-      },
-                visibility:
-                    req.body.visibility || "free",
-
-                membership:
-                    req.body.membership || "free",
-
-                price: Number(
-                    req.body.price || 0
-                ),
-
-                releaseDate:
-                    req.body.releaseDate || null,
-
-                status: "published",
-
-                featured:
-                    req.body.featured === "true",
-
-                allowComments:
-                    req.body.allowComments !== "false",
-
-                duration: Number(
-                    req.body.duration || 0
-                ),
-
-                ownerType: "brand",
-
-mediaType: req.body.type || "video",
-
-                brandCollection:
-                    req.body.brandCollection || "Bryson Tyler Originals",
-
-                fileUrl:
-                    bunnyVideo.fileUrl,
-
-                storageProvider: "bunny",
-
-                storageKey:
-                    bunnyVideo.fileName,
-
-                previewUrl:
-                    bunnyPreview.fileUrl,
-
-                previewStorageKey:
-                    bunnyPreview.fileName,
-
-                thumbnail:
-                    thumb.secure_url,
-
-                thumbnailCloudinaryId:
-                    thumb.public_id,
-
-                taggedCreators:
-                    req.body.taggedCreators
-                        ? JSON.parse(
-                              req.body.taggedCreators
-                          )
-                        : [],
-
-                approvedCollaborators: [],
-
-                protection:
-                    req.body.protection
-                        ? JSON.parse(
-                              req.body.protection
-                          )
-                        : {},
-
-            });
-
-        return res.status(201).json({
-            success: true,
-            message: "Brand content uploaded successfully.",
-            content,
-        });
-
-    } catch (error) {
-
-        console.error(error);
-
-        return res.status(500).json({
-            success: false,
-            error: error.message,
-        });
-
+    if (!video) {
+      return res.status(400).json({
+        success: false,
+        error: "Video is required.",
+      });
     }
+
+    if (!preview) {
+      return res.status(400).json({
+        success: false,
+        error: "Preview video is required.",
+      });
+    }
+
+    if (!thumbnail) {
+      return res.status(400).json({
+        success: false,
+        error: "Thumbnail is required.",
+      });
+    }
+
+    if (!req.body.title) {
+      return res.status(400).json({
+        success: false,
+        error: "Title is required.",
+      });
+    }
+
+    // -----------------------------------------
+    // UPLOAD FULL VIDEO TO BUNNY
+    // -----------------------------------------
+
+    const videoExtension = path.extname(
+      video.originalname
+    );
+
+    const videoName =
+      `${uuid()}${videoExtension}`;
+
+    const bunnyVideo =
+      await uploadToBunny(
+        video.path,
+        videoName
+      );
+
+    // -----------------------------------------
+    // UPLOAD PREVIEW TO BUNNY
+    // -----------------------------------------
+
+    const previewExtension = path.extname(
+      preview.originalname
+    );
+
+    const previewName =
+      `${uuid()}${previewExtension}`;
+
+    const bunnyPreview =
+      await uploadToBunny(
+        preview.path,
+        previewName
+      );
+
+    // -----------------------------------------
+    // UPLOAD THUMBNAIL TO CLOUDINARY
+    // -----------------------------------------
+
+    const thumb =
+      await cloudinary.uploader.upload(
+        thumbnail.path,
+        {
+          folder:
+            "bryson-tyler/thumbnails",
+        }
+      );
+
+    // -----------------------------------------
+    // REMOVE LOCAL THUMBNAIL
+    // -----------------------------------------
+
+    if (fs.existsSync(thumbnail.path)) {
+      fs.unlinkSync(thumbnail.path);
+    }
+
+    // -----------------------------------------
+    // CREATE CONTENT
+    // -----------------------------------------
+
+    const content =
+      await Content.create({
+
+        creatorId:
+          req.user._id,
+
+        title:
+          req.body.title.trim(),
+
+        description:
+          req.body.description || "",
+
+        category:
+          req.body.category || "General",
+
+        tags:
+          req.body.tags
+            ? JSON.parse(req.body.tags)
+            : [],
+
+        geoBlocking:
+          req.body.geoBlocking
+            ? JSON.parse(req.body.geoBlocking)
+            : {
+                enabled: false,
+                blockedCountries: [],
+              },
+
+        visibility:
+          req.body.visibility || "free",
+
+        membership:
+          req.body.membership || "free",
+
+        price:
+          Number(req.body.price || 0),
+
+        releaseDate:
+          req.body.releaseDate || null,
+
+        status:
+          "published",
+
+        featured:
+          req.body.featured === "true",
+
+        allowComments:
+          req.body.allowComments !== "false",
+
+        duration:
+          Number(req.body.duration || 0),
+
+        // IMPORTANT
+        ownerType:
+          "brand",
+
+        mediaType:
+          req.body.mediaType || "video",
+
+        brandCollection:
+          req.body.brandCollection ||
+          "Bryson Tyler Originals",
+
+        fileUrl:
+          bunnyVideo.fileUrl,
+
+        storageProvider:
+          "bunny",
+
+        storageKey:
+          bunnyVideo.fileName,
+
+        previewUrl:
+          bunnyPreview.fileUrl,
+
+        previewStorageKey:
+          bunnyPreview.fileName,
+
+        thumbnail:
+          thumb.secure_url,
+
+        thumbnailCloudinaryId:
+          thumb.public_id,
+
+        taggedCreators:
+          req.body.taggedCreators
+            ? JSON.parse(
+                req.body.taggedCreators
+              )
+            : [],
+
+        approvedCollaborators:
+          [],
+
+        protection:
+          req.body.protection
+            ? JSON.parse(
+                req.body.protection
+              )
+            : {},
+      });
+
+    // -----------------------------------------
+    // CLEAR BRAND GALLERY CACHE
+    // -----------------------------------------
+
+    await deleteCacheByPattern(
+      CACHE_KEYS.BRAND_GALLERY
+    );
+
+    // -----------------------------------------
+    // RESPONSE
+    // -----------------------------------------
+
+    return res.status(201).json({
+      success: true,
+      message:
+        "Brand content uploaded successfully.",
+      content,
+    });
+
+  } catch (error) {
+
+    console.error(
+      "UPLOAD BRAND CONTENT ERROR:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
 };
 
 exports.getGallery = async (req, res) => {
@@ -1052,50 +1108,196 @@ exports.watchContent = async (req, res) => {
 
     }
 };
+// ============================================================
+// GET BRAND GALLERY
+// ============================================================
 
 exports.getBrandGallery = async (req, res) => {
   try {
     const videos = await Content.find({
-      type: "brand",
-    }).sort({
-      createdAt: -1,
-    });
+      $or: [
+        {
+          ownerType: "brand",
+        },
+        {
+          type: "brand",
+        },
+      ],
+    })
+      .sort({
+        createdAt: -1,
+      })
+      .lean();
 
-    res.json({
+    return res.json({
       success: true,
       videos,
     });
 
   } catch (err) {
-    console.error("GET BRAND GALLERY ERROR:", err);
+    console.error(
+      "GET BRAND GALLERY ERROR:",
+      err
+    );
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: err.message,
-      stack: err.stack,
     });
   }
 };
 
+// ============================================================
+// DELETE BRAND VIDEO
+// ============================================================
+
 exports.deleteBrandVideo = async (req, res) => {
   try {
-    const video = await Content.findById(req.params.id);
+
+    const video =
+      await Content.findById(
+        req.params.id
+      );
 
     if (!video) {
       return res.status(404).json({
+        success: false,
         error: "Video not found.",
       });
     }
 
+    // -----------------------------------------
+    // MAKE SURE THIS IS BRAND CONTENT
+    // -----------------------------------------
+
+    if (
+      video.ownerType !== "brand"
+    ) {
+      return res.status(400).json({
+        success: false,
+        error:
+          "This content does not belong to the brand gallery.",
+      });
+    }
+
+    // -----------------------------------------
+    // DELETE VIDEO FROM BUNNY
+    // -----------------------------------------
+
+    if (video.storageKey) {
+
+      try {
+
+        await axios.delete(
+          `${process.env.BUNNY_STORAGE_HOST}/${process.env.BUNNY_STORAGE_ZONE}/${video.storageKey}`,
+          {
+            headers: {
+              AccessKey:
+                process.env.BUNNY_STORAGE_PASSWORD,
+            },
+          }
+        );
+
+      } catch (bunnyError) {
+
+        console.error(
+          "BUNNY DELETE ERROR:",
+          bunnyError.response?.data ||
+          bunnyError.message
+        );
+
+      }
+
+    }
+
+    // -----------------------------------------
+    // DELETE PREVIEW FROM BUNNY
+    // -----------------------------------------
+
+    if (video.previewStorageKey) {
+
+      try {
+
+        await axios.delete(
+          `${process.env.BUNNY_STORAGE_HOST}/${process.env.BUNNY_STORAGE_ZONE}/${video.previewStorageKey}`,
+          {
+            headers: {
+              AccessKey:
+                process.env.BUNNY_STORAGE_PASSWORD,
+            },
+          }
+        );
+
+      } catch (bunnyError) {
+
+        console.error(
+          "BUNNY PREVIEW DELETE ERROR:",
+          bunnyError.response?.data ||
+          bunnyError.message
+        );
+
+      }
+
+    }
+
+    // -----------------------------------------
+    // DELETE THUMBNAIL FROM CLOUDINARY
+    // -----------------------------------------
+
+    if (
+      video.thumbnailCloudinaryId
+    ) {
+
+      try {
+
+        await cloudinary.uploader.destroy(
+          video.thumbnailCloudinaryId
+        );
+
+      } catch (cloudinaryError) {
+
+        console.error(
+          "CLOUDINARY DELETE ERROR:",
+          cloudinaryError.message
+        );
+
+      }
+
+    }
+
+    // -----------------------------------------
+    // DELETE DATABASE RECORD
+    // -----------------------------------------
+
     await video.deleteOne();
 
-    res.json({
+    // -----------------------------------------
+    // CLEAR BRAND GALLERY CACHE
+    // -----------------------------------------
+
+    await deleteCacheByPattern(
+      `${CACHE_KEYS.BRAND_GALLERY}*`
+    );
+
+    // -----------------------------------------
+    // RESPONSE
+    // -----------------------------------------
+
+    return res.json({
       success: true,
-      message: "Video deleted.",
+      message:
+        "Brand video deleted successfully.",
     });
 
   } catch (err) {
-    res.status(500).json({
+
+    console.error(
+      "DELETE BRAND VIDEO ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
       error: err.message,
     });
   }

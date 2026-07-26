@@ -1,14 +1,92 @@
 const User = require("../models_/user");
 const Content = require("../models_/content");
 const Subscription = require("../models_/subscription");
-const Payment = require("../models_/payment");
+
 const createNotification = require("../utils_/createNotification");
+
+const {
+  getCache,
+  setCache,
+  deleteCacheByPattern,
+} = require("../utils_/cache");
+
+const {
+  creatorApprovedEmail,
+  creatorRejectedEmail,
+} = require("../services/emailService");
+
+
+// ============================================================
+// CACHE KEYS
+// ============================================================
+
+const CACHE_KEYS = {
+  STATS: "admin:stats",
+  USERS: "admin:users",
+  CONTENT: "admin:content",
+  PENDING_CONTENT: "admin:content:pending",
+  REVIEWED_CONTENT: "admin:content:reviewed",
+  PENDING_CREATORS: "admin:creators:pending",
+  FANS: "admin:fans",
+  CREATORS: "admin:creators",
+  MEMBERSHIPS: "admin:memberships",
+};
+
+
+// ============================================================
+// CACHE TTL
+// ============================================================
+
+const CACHE_TTL = {
+  STATS: 30,
+  LISTS: 60,
+  PENDING: 30,
+};
+
+
+// ============================================================
+// INVALIDATE ADMIN CACHE
+// ============================================================
+
+const invalidateAdminCache = async () => {
+  try {
+    await deleteCacheByPattern("admin:*");
+
+    console.log("✅ Admin cache invalidated");
+  } catch (error) {
+    console.error(
+      "❌ Failed to invalidate admin cache:",
+      error.message
+    );
+  }
+};
+
+
+// ============================================================
+// GET ADMIN STATS
+// ============================================================
 
 exports.getStats = async (req, res) => {
   try {
-    // =========================================
+
+    // --------------------------------------------------------
+    // CHECK REDIS CACHE
+    // --------------------------------------------------------
+
+    const cachedStats = await getCache(CACHE_KEYS.STATS);
+
+    if (cachedStats) {
+
+      console.log("⚡ Admin stats served from Redis");
+
+      return res.json(cachedStats);
+
+    }
+
+
+    // --------------------------------------------------------
     // BASIC STATS
-    // =========================================
+    // --------------------------------------------------------
 
     const totalFans = await User.countDocuments({
       role: "fan",
@@ -60,52 +138,59 @@ exports.getStats = async (req, res) => {
     });
 
 
-    // =========================================
+    // --------------------------------------------------------
     // PENDING CREATORS
-    // =========================================
+    // --------------------------------------------------------
 
     const pendingCreators = await User.find({
       role: "creator",
       "creatorApproval.status": "pending",
     })
-      .select(`
-        name
-        profileImage
-        creatorApplication
-        creatorApproval
-        createdAt
-      `)
-      .sort({ createdAt: -1 })
-      .limit(5);
+      .select(
+        "name profileImage creatorApplication creatorApproval createdAt"
+      )
+      .sort({
+        createdAt: -1,
+      })
+      .limit(5)
+      .lean();
 
 
-    // =========================================
+    // --------------------------------------------------------
     // LATEST USERS
-    // =========================================
+    // --------------------------------------------------------
 
     const latestUsers = await User.find()
       .select("name role createdAt")
-      .sort({ createdAt: -1 })
-      .limit(6);
+      .sort({
+        createdAt: -1,
+      })
+      .limit(6)
+      .lean();
 
 
-    // =========================================
+    // --------------------------------------------------------
     // NOTIFICATIONS
-    // =========================================
+    // --------------------------------------------------------
 
     const notifications = [];
 
 
-    // -----------------------------------------
+    // --------------------------------------------------------
     // NEW USER SIGNUPS
-    // -----------------------------------------
+    // --------------------------------------------------------
 
     const newUsers = await User.find()
       .select("name role createdAt")
-      .sort({ createdAt: -1 })
-      .limit(20);
+      .sort({
+        createdAt: -1,
+      })
+      .limit(20)
+      .lean();
+
 
     newUsers.forEach((user) => {
+
       notifications.push({
         id: `signup-${user._id}`,
         type: "signup",
@@ -116,17 +201,22 @@ exports.getStats = async (req, res) => {
         createdAt: user.createdAt,
         unread: true,
       });
+
     });
 
 
-    // -----------------------------------------
+    // --------------------------------------------------------
     // CREATOR APPLICATIONS
-    // -----------------------------------------
+    // --------------------------------------------------------
 
     const creatorApplications = await User.find({
       role: "creator",
       "creatorApproval.status": {
-        $in: ["pending", "approved", "rejected"],
+        $in: [
+          "pending",
+          "approved",
+          "rejected",
+        ],
       },
     })
       .select(
@@ -135,83 +225,107 @@ exports.getStats = async (req, res) => {
       .sort({
         "creatorApplication.submittedAt": -1,
       })
-      .limit(20);
+      .limit(20)
+      .lean();
+
 
     creatorApplications.forEach((creator) => {
+
       const submittedAt =
         creator.creatorApplication?.submittedAt ||
         creator.createdAt;
+
 
       notifications.push({
         id: `creator-${creator._id}`,
         type: "creator",
         title: "Creator Application Submitted",
-        message: `${creator.name} submitted a creator application for approval.`,
+        message:
+          `${creator.name} submitted a creator application for approval.`,
         userId: creator._id,
         userName: creator.name,
         createdAt: submittedAt,
         unread: true,
       });
+
     });
 
 
-    // -----------------------------------------
+    // --------------------------------------------------------
     // CREATOR CONTENT UPLOADS
-    // -----------------------------------------
+    // --------------------------------------------------------
 
     const latestContent = await Content.find({
       ownerType: "creator",
     })
-      .populate("creatorId", "name")
+      .populate(
+        "creatorId",
+        "name"
+      )
       .select(
         "title creatorId status createdAt"
       )
       .sort({
         createdAt: -1,
       })
-      .limit(20);
+      .limit(20)
+      .lean();
+
 
     latestContent.forEach((content) => {
+
       notifications.push({
         id: `content-${content._id}`,
         type: "gallery",
         title: "New Creator Content",
-        message: `${content.creatorId?.name || "A creator"} uploaded "${content.title}".`,
-        userId: content.creatorId?._id || null,
-        userName: content.creatorId?.name || "Unknown Creator",
+        message:
+          `${content.creatorId?.name || "A creator"} uploaded "${content.title}".`,
+        userId:
+          content.creatorId?._id || null,
+        userName:
+          content.creatorId?.name ||
+          "Unknown Creator",
         contentId: content._id,
         createdAt: content.createdAt,
         unread: true,
       });
+
     });
 
 
-    // -----------------------------------------
+    // --------------------------------------------------------
     // MEMBERSHIP UPGRADES
-    // -----------------------------------------
+    // --------------------------------------------------------
 
     const membershipUsers = await User.find({
       "membership.plan": {
-        $in: ["VIP", "ELITE"],
+        $in: [
+          "VIP",
+          "ELITE",
+        ],
       },
       "membership.startDate": {
         $exists: true,
       },
     })
       .select(
-        "name membership"
+        "name membership updatedAt"
       )
       .sort({
         "membership.startDate": -1,
       })
-      .limit(20);
+      .limit(20)
+      .lean();
+
 
     membershipUsers.forEach((user) => {
+
       notifications.push({
         id: `membership-${user._id}`,
         type: "membership",
         title: "Membership Upgrade",
-        message: `${user.name} upgraded to ${user.membership.plan} membership.`,
+        message:
+          `${user.name} upgraded to ${user.membership.plan} membership.`,
         userId: user._id,
         userName: user.name,
         plan: user.membership.plan,
@@ -220,43 +334,63 @@ exports.getStats = async (req, res) => {
           user.updatedAt,
         unread: true,
       });
+
     });
 
 
-    // -----------------------------------------
+    // --------------------------------------------------------
     // FAN CREATOR SUBSCRIPTIONS
-    // -----------------------------------------
+    // --------------------------------------------------------
 
     const subscriptions = await Subscription.find()
-      .populate("fanId", "name")
-      .populate("creatorId", "name")
+      .populate(
+        "fanId",
+        "name"
+      )
+      .populate(
+        "creatorId",
+        "name"
+      )
       .sort({
         createdAt: -1,
       })
-      .limit(20);
+      .limit(20)
+      .lean();
+
 
     subscriptions.forEach((subscription) => {
+
       notifications.push({
         id: `subscription-${subscription._id}`,
         type: "subscription",
         title: "New Creator Subscription",
-        message: `${subscription.fanId?.name || "A fan"} subscribed to ${subscription.creatorId?.name || "a creator"}.`,
-        userId: subscription.fanId?._id || null,
-        userName: subscription.fanId?.name || "Unknown Fan",
-        creatorId: subscription.creatorId?._id || null,
+        message:
+          `${subscription.fanId?.name || "A fan"} subscribed to ${subscription.creatorId?.name || "a creator"}.`,
+        userId:
+          subscription.fanId?._id || null,
+        userName:
+          subscription.fanId?.name ||
+          "Unknown Fan",
+        creatorId:
+          subscription.creatorId?._id ||
+          null,
         creatorName:
           subscription.creatorId?.name ||
           "Unknown Creator",
-        amount: subscription.amount || 0,
-        createdAt: subscription.createdAt,
+        amount:
+          subscription.amount ||
+          0,
+        createdAt:
+          subscription.createdAt,
         unread: true,
       });
+
     });
 
 
-    // =========================================
-    // SORT ALL NOTIFICATIONS
-    // =========================================
+    // --------------------------------------------------------
+    // SORT NOTIFICATIONS
+    // --------------------------------------------------------
 
     notifications.sort(
       (a, b) =>
@@ -265,607 +399,1614 @@ exports.getStats = async (req, res) => {
     );
 
 
-    // =========================================
+    // --------------------------------------------------------
     // RESPONSE
-    // =========================================
+    // --------------------------------------------------------
 
-    res.json({
+    const responseData = {
+
       success: true,
 
       stats: {
+
         totalFans,
+
         totalCreators,
+
         pendingApplications,
+
         vipMembers,
+
         eliteMembers,
+
         freeMembers,
+
         totalBrandVideos,
+
         pendingContent,
+
         publishedVideos,
+
         featuredVideos,
+
         draftVideos,
+
         scheduledVideos,
 
         totalRevenue: 0,
+
         pendingPayouts: 0,
+
         todaysRevenue: 0,
+
       },
 
       pendingCreators,
 
       latestUsers,
 
-      notifications: notifications.slice(0, 50),
-    });
+      notifications:
+        notifications.slice(0, 50),
+
+    };
+
+
+    // --------------------------------------------------------
+    // SAVE TO REDIS
+    // --------------------------------------------------------
+
+    await setCache(
+      CACHE_KEYS.STATS,
+      responseData,
+      CACHE_TTL.STATS
+    );
+
+
+    console.log(
+      "💾 Admin stats saved to Redis"
+    );
+
+
+    return res.json(
+      responseData
+    );
 
   } catch (err) {
-    console.error("ADMIN STATS ERROR:", err);
 
-    res.status(500).json({
+    console.error(
+      "ADMIN STATS ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
       success: false,
+
       error: err.message,
+
     });
+
   }
 };
 
+
+// ============================================================
+// GET ALL USERS
+// ============================================================
+
 exports.getAllUsers = async (req, res) => {
-    try {
 
-        const users = await User.find()
-            .select("-password")
-            .sort({
-                createdAt: -1,
-            });
+  try {
 
-        res.json({
-            success: true,
-            users,
-        });
+    const cachedUsers =
+      await getCache(
+        CACHE_KEYS.USERS
+      );
 
-    } catch (err) {
 
-        res.status(500).json({
-            error: err.message,
-        });
+    if (cachedUsers) {
+
+      console.log(
+        "⚡ Admin users served from Redis"
+      );
+
+      return res.json(
+        cachedUsers
+      );
 
     }
+
+
+    const users =
+      await User.find()
+        .select("-password")
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
+
+
+    const responseData = {
+
+      success: true,
+
+      users,
+
+    };
+
+
+    await setCache(
+      CACHE_KEYS.USERS,
+      responseData,
+      CACHE_TTL.LISTS
+    );
+
+
+    return res.json(
+      responseData
+    );
+
+  } catch (err) {
+
+    console.error(
+      "GET ALL USERS ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
 };
+
+
+// ============================================================
+// GET ALL CONTENT
+// ============================================================
 
 exports.getAllContent = async (req, res) => {
-    try {
 
-        const content = await Content.find()
-            .populate("creatorId", "name email profileImage")
-            .populate("approvedCollaborators", "name")
-            .sort({
-                createdAt: -1,
-            });
+  try {
 
-        res.json({
-            success: true,
-            content,
-        });
+    const cachedContent =
+      await getCache(
+        CACHE_KEYS.CONTENT
+      );
 
-    } catch (err) {
 
-        res.status(500).json({
-            error: err.message,
-        });
+    if (cachedContent) {
+
+      console.log(
+        "⚡ Admin content served from Redis"
+      );
+
+      return res.json(
+        cachedContent
+      );
 
     }
+
+
+    const content =
+      await Content.find()
+        .populate(
+          "creatorId",
+          "name email profileImage"
+        )
+        .populate(
+          "approvedCollaborators",
+          "name"
+        )
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
+
+
+    const responseData = {
+
+      success: true,
+
+      content,
+
+    };
+
+
+    await setCache(
+      CACHE_KEYS.CONTENT,
+      responseData,
+      CACHE_TTL.LISTS
+    );
+
+
+    return res.json(
+      responseData
+    );
+
+  } catch (err) {
+
+    console.error(
+      "GET ALL CONTENT ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
 };
 
 
+// ============================================================
+// APPROVE CONTENT
+// ============================================================
 
 exports.approveContent = async (req, res) => {
-    try {
 
-        const content = await Content.findById(req.params.id);
+  try {
 
-        if (!content) {
-            return res.status(404).json({
-                error: "Content not found.",
-            });
-        }
-if (content.status !== "pending_review") {
-    return res.status(400).json({
+    const content =
+      await Content.findById(
+        req.params.id
+      );
+
+
+    if (!content) {
+
+      return res.status(404).json({
+
         success: false,
-        message: "Only pending review content can be approved."
-    });
-}
-        content.status = "scheduled";
-        content.reviewedBy = req.user._id;
-        content.reviewedAt = new Date();
 
-        await content.save();
-await createNotification({
-  recipient: creator._id,
-  sender: req.user?._id || null,
-  type: "creator_content_approved",
-  title: "Content Approved",
-  message:
-    "Your content has been approved and is now scheduled for publication.",
-  link: "/dashboard/content",
-});
-        res.json({
-            success: true,
-            message: "Content approved successfully.",
-            content,
-        });
+        error:
+          "Content not found.",
 
-    } catch (err) {
-
-        res.status(500).json({
-            error: err.message,
-        });
+      });
 
     }
+
+
+    if (
+      content.status !==
+      "pending_review"
+    ) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message:
+          "Only pending review content can be approved.",
+
+      });
+
+    }
+
+
+    content.status =
+      "scheduled";
+
+    content.reviewedBy =
+      req.user._id;
+
+    content.reviewedAt =
+      new Date();
+
+
+    await content.save();
+
+
+    // Get creator
+    const creator =
+      await User.findById(
+        content.creatorId
+      );
+
+
+    // Create notification
+    if (creator) {
+
+      await createNotification({
+
+        recipient:
+          creator._id,
+
+        sender:
+          req.user?._id ||
+          null,
+
+        type:
+          "creator_content_approved",
+
+        title:
+          "Content Approved",
+
+        message:
+          "Your content has been approved and is now scheduled for publication.",
+
+        link:
+          "/dashboard/content",
+
+      });
+
+    }
+
+
+    // Invalidate cache
+    await invalidateAdminCache();
+
+
+    return res.json({
+
+      success: true,
+
+      message:
+        "Content approved successfully.",
+
+      content,
+
+    });
+
+  } catch (err) {
+
+    console.error(
+      "APPROVE CONTENT ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
 };
+
+
+// ============================================================
+// REJECT CONTENT
+// ============================================================
 
 exports.rejectContent = async (req, res) => {
-    try {
 
-        const content = await Content.findById(req.params.id);
-console.log("==============");
-console.log("CONTENT STATUS:", content?.status);
-console.log("REQUEST BODY:", req.body);
-        if (!content) {
-            return res.status(404).json({
-                error: "Content not found.",
-            });
-        }
-if (content.status !== "pending_review") {
-    return res.status(400).json({
+  try {
+
+    const content =
+      await Content.findById(
+        req.params.id
+      );
+
+
+    if (!content) {
+
+      return res.status(404).json({
+
         success: false,
-        message: "Only pending review content can be approved."
-    });
-}
-        content.status = "rejected";
-        content.reviewComment = req.body.comment || "";
-        content.reviewedBy = req.user._id;
-        content.reviewedAt = new Date();
 
-        await content.save();
-await createNotification({
-  recipient: creator._id,
-  sender: req.user?._id || null,
-  type: "creator_content_rejected",
-  title: "Content Rejected",
-  message: content.reviewComment
-    ? `Your content was rejected. Reason: ${content.reviewComment}`
-    : "Your content was rejected. Please review the feedback.",
-  link: "/dashboard/content",
-});
-        res.json({
-            success: true,
-            message: "Content rejected.",
-            content,
-        });
+        error:
+          "Content not found.",
 
-    } catch (err) {
-
-        res.status(500).json({
-            error: err.message,
-        });
+      });
 
     }
+
+
+    if (
+      content.status !==
+      "pending_review"
+    ) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        message:
+          "Only pending review content can be rejected.",
+
+      });
+
+    }
+
+
+    content.status =
+      "rejected";
+
+    content.reviewComment =
+      req.body.comment || "";
+
+    content.reviewedBy =
+      req.user._id;
+
+    content.reviewedAt =
+      new Date();
+
+
+    await content.save();
+
+
+    // Get creator
+    const creator =
+      await User.findById(
+        content.creatorId
+      );
+
+
+    // Create notification
+    if (creator) {
+
+      await createNotification({
+
+        recipient:
+          creator._id,
+
+        sender:
+          req.user?._id ||
+          null,
+
+        type:
+          "creator_content_rejected",
+
+        title:
+          "Content Rejected",
+
+        message:
+          content.reviewComment
+
+            ? `Your content was rejected. Reason: ${content.reviewComment}`
+
+            : "Your content was rejected. Please review the feedback.",
+
+        link:
+          "/dashboard/content",
+
+      });
+
+    }
+
+
+    // Invalidate cache
+    await invalidateAdminCache();
+
+
+    return res.json({
+
+      success: true,
+
+      message:
+        "Content rejected.",
+
+      content,
+
+    });
+
+  } catch (err) {
+
+    console.error(
+      "REJECT CONTENT ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
 };
+
+
+// ============================================================
+// GET PENDING CONTENT
+// ============================================================
 
 exports.getPendingContent = async (req, res) => {
 
-    try {
-
-        const content = await Content.find({
-  status: {
-    $in: ["pending_review", "pending"],
-  },
-})
-        .populate(
-            "creatorId",
-            "name email profileImage creatorApplication"
-        )
-
-        .sort({
-            createdAt: -1
-        });
-
-        res.json({
-            success: true,
-            content
-        });
-
-    } catch(err){
-
-        res.status(500).json({
-            success:false,
-            error:err.message
-        });
-
-    }
-
-};
-
-exports.requestChanges = async (req, res) => {
-    try {
-
-        const content = await Content.findById(req.params.id);
-
-        if (!content) {
-            return res.status(404).json({
-                error: "Content not found.",
-            });
-        }
-
-        content.status = "changes_requested";
-        content.reviewComment = req.body.comment || "";
-        content.reviewedBy = req.user._id;
-        content.reviewedAt = new Date();
-
-        await content.save();
-
-        res.json({
-            success: true,
-            message: "Changes requested.",
-            content,
-        });
-
-    } catch (err) {
-
-        res.status(500).json({
-            error: err.message,
-        });
-
-    }
-};
-
-exports.publishScheduledContent = async (req, res) => {
-    try {
-
-        const contents = await Content.find({
-            status: "scheduled",
-            releaseDate: {
-                $lte: new Date(),
-            },
-        });
-
-        for (const content of contents) {
-            content.status = "published";
-            await content.save();
-        }
-
-        res.json({
-            success: true,
-            published: contents.length,
-        });
-
-    } catch (err) {
-
-        res.status(500).json({
-            error: err.message,
-        });
-
-    }
-};
-const {
-  creatorApprovedEmail,
-} = require("../services/emailService");
-exports.approveCreator = async (req, res) => {
-    try {
-
-        const user = await User.findById(req.params.id);
-
-        if (!user) {
-            return res.status(404).json({
-                error: "Creator not found.",
-            });
-        }
-
-        if (user.role !== "creator") {
-            return res.status(400).json({
-                error: "User is not a creator.",
-            });
-        }
-
-        if (!user.creatorApproval) {
-            user.creatorApproval = {};
-        }
-
-        user.creatorApproval.status = "approved";
-        user.creatorApproval.reviewedAt = new Date();
-
-        console.log("REQ.USER =", req.user);
-console.log("CREATOR =", user.creatorApproval);
-        // user.creatorApproval.reviewedBy = req.user._id;
-        user.creatorApproval.rejectionReason = "";
-
-        await user.save();
-
-        await createNotification({
-  recipient: user._id,
-  sender: req.user?._id || null,
-  type: "creator_application_approved",
-  title: "Creator Application Approved",
-  message:
-    "Congratulations! Your creator application has been approved.",
-  link: "/dashboard",
-});
-
-await creatorApprovedEmail(user);
-
-        res.json({
-            success: true,
-            message: "Creator approved successfully.",
-            creatorApproval: user.creatorApproval,
-        });
-
-    } catch (err) {
-
-        console.error(err);
-
-        res.status(500).json({
-            error: err.message,
-        });
-
-    }
-};
-const {
-  creatorRejectedEmail,
-} = require("../services/emailService");
-
-
-exports.rejectCreator = async (req, res) => {
-    try {
-
-        const user = await User.findById(req.params.id);
-
-        if (!user) {
-            return res.status(404).json({
-                error: "Creator not found.",
-            });
-        }
-
-        if (user.role !== "creator") {
-            return res.status(400).json({
-                error: "User is not a creator.",
-            });
-        }
-
-        if (!user.creatorApproval) {
-            user.creatorApproval = {};
-        }
-
-        user.creatorApproval.status = "rejected";
-        user.creatorApproval.reviewedAt = new Date();
-        // user.creatorApproval.reviewedBy = req.user._id;
-        user.creatorApproval.rejectionReason =
-            req.body.reason || "";
-
-        await user.save();
-
-        await createNotification({
-  recipient: user._id,
-  sender: req.user?._id || null,
-  type: "creator_application_rejected",
-  title: "Creator Application Rejected",
-  message: rejectionReason
-    ? `Your creator application was rejected. Reason: ${rejectionReason}`
-    : "Your creator application was rejected.",
-  link: "/dashboard",
-});
-await creatorRejectedEmail(
-    user,
-    rejectionReason
-);
-        res.json({
-            success: true,
-            message: "Creator rejected successfully.",
-            creatorApproval: user.creatorApproval,
-        });
-
-    } catch (err) {
-
-        console.error(err);
-
-        res.status(500).json({
-            error: err.message,
-        });
-
-    }
-};
-
-exports.getPendingCreators = async (req, res) => {
-    try {
-
-        const creators = await User.find({
-            role: "creator",
-            "creatorApproval.status": "pending",
-        })
-            .select(
-                `
-                name
-                email
-                profileImage
-                country
-                state
-                city
-                bio
-                createdAt
-                didit
-                isKYCVerified
-                kycStatus
-                creatorApplication
-                creatorApproval
-                `
-            )
-            .sort({
-                "creatorApplication.submittedAt": -1,
-            });
-
-        res.json({
-            success: true,
-            count: creators.length,
-            creators,
-        });
-
-    } catch (err) {
-
-        res.status(500).json({
-            error: err.message,
-        });
-
-    }
-};
-
-exports.getAllFans = async (req, res) => {
-    try {
-
-        const fans = await User.find({
-            role: "fan",
-        })
-        .select("-password")
-        .sort({
-            createdAt: -1,
-        });
-
-        res.json({
-            success: true,
-            fans,
-        });
-
-    } catch (err) {
-
-        res.status(500).json({
-            error: err.message,
-        });
-
-    }
-};
-
-exports.getAllCreators = async (req, res) => {
-    try {
-
-        const creators = await User.find({
-            role: "creator",
-        })
-            .select("-password")
-            .sort({ createdAt: -1 });
-
-        res.json({
-            success: true,
-            creators,
-        });
-
-    } catch (err) {
-
-        res.status(500).json({
-            error: err.message,
-        });
-
-    }
-};
-
-
-exports.getMemberships = async (req, res) => {
-    try {
-
-        const members = await User.find({
-            role: "fan",
-        })
-            .select("-password")
-            .sort({
-                createdAt: -1,
-            });
-
-        const stats = {
-            total: members.length,
-
-            free: members.filter(
-                (m) => m.membership?.plan === "FREE"
-            ).length,
-
-            vip: members.filter(
-                (m) => m.membership?.plan === "VIP"
-            ).length,
-
-            elite: members.filter(
-                (m) => m.membership?.plan === "Elite"
-            ).length,
-
-            active: members.filter(
-                (m) => m.membership?.status === "active"
-            ).length,
-
-            expired: members.filter(
-                (m) => m.membership?.status === "expired"
-            ).length,
-        };
-
-        res.json({
-            success: true,
-            members,
-            stats,
-        });
-
-    } catch (err) {
-
-        res.status(500).json({
-            error: err.message,
-        });
-
-    }
-};
-
-exports.deleteUser = async (req, res) => {
-    const { id } = req.params;
-
-    const user = await User.findById(id);
-
-    if (!user) {
-        return res.status(404).json({
-            success: false,
-            message: "User not found",
-        });
-    }
-
-    await User.findByIdAndDelete(id);
-
-    res.json({
-        success: true,
-        message: "User deleted successfully",
-    });
-};
-
-exports.getReviewedContent = async (req, res) => {
   try {
 
-    const content = await Content.find({
-      status: {
-        $in: [
-          "scheduled",
-          "published",
-          "rejected",
-          "changes_requested",
-        ],
-      },
-    })
-      .populate(
-        "creatorId",
-        "name creatorApplication profileImage"
-      )
-      .sort({
-        reviewedAt: -1,
+    const cachedContent =
+      await getCache(
+        CACHE_KEYS.PENDING_CONTENT
+      );
+
+
+    if (cachedContent) {
+
+      console.log(
+        "⚡ Pending content served from Redis"
+      );
+
+      return res.json(
+        cachedContent
+      );
+
+    }
+
+
+    const content =
+      await Content.find({
+
+        status: {
+
+          $in: [
+            "pending_review",
+            "pending",
+          ],
+
+        },
+
+      })
+        .populate(
+          "creatorId",
+          "name email profileImage creatorApplication"
+        )
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
+
+
+    const responseData = {
+
+      success: true,
+
+      content,
+
+    };
+
+
+    await setCache(
+
+      CACHE_KEYS.PENDING_CONTENT,
+
+      responseData,
+
+      CACHE_TTL.PENDING
+
+    );
+
+
+    return res.json(
+      responseData
+    );
+
+  } catch (err) {
+
+    console.error(
+      "GET PENDING CONTENT ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
+};
+
+
+// ============================================================
+// REQUEST CONTENT CHANGES
+// ============================================================
+
+exports.requestChanges = async (req, res) => {
+
+  try {
+
+    const content =
+      await Content.findById(
+        req.params.id
+      );
+
+
+    if (!content) {
+
+      return res.status(404).json({
+
+        success: false,
+
+        error:
+          "Content not found.",
+
       });
 
-    res.json({
+    }
+
+
+    content.status =
+      "changes_requested";
+
+    content.reviewComment =
+      req.body.comment || "";
+
+    content.reviewedBy =
+      req.user._id;
+
+    content.reviewedAt =
+      new Date();
+
+
+    await content.save();
+
+
+    await invalidateAdminCache();
+
+
+    return res.json({
+
       success: true,
+
+      message:
+        "Changes requested.",
+
       content,
+
     });
 
   } catch (err) {
 
-    res.status(500).json({
+    console.error(
+      "REQUEST CHANGES ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
       error: err.message,
+
     });
 
   }
+
+};
+
+
+// ============================================================
+// PUBLISH SCHEDULED CONTENT
+// ============================================================
+
+exports.publishScheduledContent = async (req, res) => {
+
+  try {
+
+    const contents =
+      await Content.find({
+
+        status:
+          "scheduled",
+
+        releaseDate: {
+
+          $lte:
+            new Date(),
+
+        },
+
+      });
+
+
+    for (
+      const content of contents
+    ) {
+
+      content.status =
+        "published";
+
+      await content.save();
+
+    }
+
+
+    await invalidateAdminCache();
+
+
+    return res.json({
+
+      success: true,
+
+      published:
+        contents.length,
+
+    });
+
+  } catch (err) {
+
+    console.error(
+      "PUBLISH SCHEDULED CONTENT ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
+};
+
+
+// ============================================================
+// APPROVE CREATOR
+// ============================================================
+
+exports.approveCreator = async (req, res) => {
+
+  try {
+
+    const user =
+      await User.findById(
+        req.params.id
+      );
+
+
+    if (!user) {
+
+      return res.status(404).json({
+
+        success: false,
+
+        error:
+          "Creator not found.",
+
+      });
+
+    }
+
+
+    if (
+      user.role !==
+      "creator"
+    ) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        error:
+          "User is not a creator.",
+
+      });
+
+    }
+
+
+    if (
+      !user.creatorApproval
+    ) {
+
+      user.creatorApproval = {};
+
+    }
+
+
+    user.creatorApproval.status =
+      "approved";
+
+    user.creatorApproval.reviewedAt =
+      new Date();
+
+    user.creatorApproval.rejectionReason =
+      "";
+
+
+    await user.save();
+
+
+    await createNotification({
+
+      recipient:
+        user._id,
+
+      sender:
+        req.user?._id ||
+        null,
+
+      type:
+        "creator_application_approved",
+
+      title:
+        "Creator Application Approved",
+
+      message:
+        "Congratulations! Your creator application has been approved.",
+
+      link:
+        "/dashboard",
+
+    });
+
+
+    await creatorApprovedEmail(
+      user
+    );
+
+
+    await invalidateAdminCache();
+
+
+    return res.json({
+
+      success: true,
+
+      message:
+        "Creator approved successfully.",
+
+      creatorApproval:
+        user.creatorApproval,
+
+    });
+
+  } catch (err) {
+
+    console.error(
+      "APPROVE CREATOR ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
+};
+
+
+// ============================================================
+// REJECT CREATOR
+// ============================================================
+
+exports.rejectCreator = async (req, res) => {
+
+  try {
+
+    const user =
+      await User.findById(
+        req.params.id
+      );
+
+
+    if (!user) {
+
+      return res.status(404).json({
+
+        success: false,
+
+        error:
+          "Creator not found.",
+
+      });
+
+    }
+
+
+    if (
+      user.role !==
+      "creator"
+    ) {
+
+      return res.status(400).json({
+
+        success: false,
+
+        error:
+          "User is not a creator.",
+
+      });
+
+    }
+
+
+    const rejectionReason =
+      req.body.reason || "";
+
+
+    if (
+      !user.creatorApproval
+    ) {
+
+      user.creatorApproval = {};
+
+    }
+
+
+    user.creatorApproval.status =
+      "rejected";
+
+    user.creatorApproval.reviewedAt =
+      new Date();
+
+    user.creatorApproval.rejectionReason =
+      rejectionReason;
+
+
+    await user.save();
+
+
+    await createNotification({
+
+      recipient:
+        user._id,
+
+      sender:
+        req.user?._id ||
+        null,
+
+      type:
+        "creator_application_rejected",
+
+      title:
+        "Creator Application Rejected",
+
+      message:
+        rejectionReason
+
+          ? `Your creator application was rejected. Reason: ${rejectionReason}`
+
+          : "Your creator application was rejected.",
+
+      link:
+        "/dashboard",
+
+    });
+
+
+    await creatorRejectedEmail(
+      user,
+      rejectionReason
+    );
+
+
+    await invalidateAdminCache();
+
+
+    return res.json({
+
+      success: true,
+
+      message:
+        "Creator rejected successfully.",
+
+      creatorApproval:
+        user.creatorApproval,
+
+    });
+
+  } catch (err) {
+
+    console.error(
+      "REJECT CREATOR ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
+};
+
+
+// ============================================================
+// GET PENDING CREATORS
+// ============================================================
+
+exports.getPendingCreators = async (req, res) => {
+
+  try {
+
+    const cachedCreators =
+      await getCache(
+        CACHE_KEYS.PENDING_CREATORS
+      );
+
+
+    if (cachedCreators) {
+
+      console.log(
+        "⚡ Pending creators served from Redis"
+      );
+
+      return res.json(
+        cachedCreators
+      );
+
+    }
+
+
+    const creators =
+      await User.find({
+
+        role:
+          "creator",
+
+        "creatorApproval.status":
+          "pending",
+
+      })
+        .select(
+          `
+          name
+          email
+          profileImage
+          country
+          state
+          city
+          bio
+          createdAt
+          didit
+          isKYCVerified
+          kycStatus
+          creatorApplication
+          creatorApproval
+          `
+        )
+        .sort({
+
+          "creatorApplication.submittedAt":
+            -1,
+
+        })
+        .lean();
+
+
+    const responseData = {
+
+      success: true,
+
+      count:
+        creators.length,
+
+      creators,
+
+    };
+
+
+    await setCache(
+
+      CACHE_KEYS.PENDING_CREATORS,
+
+      responseData,
+
+      CACHE_TTL.PENDING
+
+    );
+
+
+    return res.json(
+      responseData
+    );
+
+  } catch (err) {
+
+    console.error(
+      "GET PENDING CREATORS ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
+};
+
+
+// ============================================================
+// GET ALL FANS
+// ============================================================
+
+exports.getAllFans = async (req, res) => {
+
+  try {
+
+    const cachedFans =
+      await getCache(
+        CACHE_KEYS.FANS
+      );
+
+
+    if (cachedFans) {
+
+      console.log(
+        "⚡ Fans served from Redis"
+      );
+
+      return res.json(
+        cachedFans
+      );
+
+    }
+
+
+    const fans =
+      await User.find({
+
+        role:
+          "fan",
+
+      })
+        .select("-password")
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
+
+
+    const responseData = {
+
+      success: true,
+
+      fans,
+
+    };
+
+
+    await setCache(
+
+      CACHE_KEYS.FANS,
+
+      responseData,
+
+      CACHE_TTL.LISTS
+
+    );
+
+
+    return res.json(
+      responseData
+    );
+
+  } catch (err) {
+
+    console.error(
+      "GET ALL FANS ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
+};
+
+
+// ============================================================
+// GET ALL CREATORS
+// ============================================================
+
+exports.getAllCreators = async (req, res) => {
+
+  try {
+
+    const cachedCreators =
+      await getCache(
+        CACHE_KEYS.CREATORS
+      );
+
+
+    if (cachedCreators) {
+
+      console.log(
+        "⚡ Creators served from Redis"
+      );
+
+      return res.json(
+        cachedCreators
+      );
+
+    }
+
+
+    const creators =
+      await User.find({
+
+        role:
+          "creator",
+
+      })
+        .select("-password")
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
+
+
+    const responseData = {
+
+      success: true,
+
+      creators,
+
+    };
+
+
+    await setCache(
+
+      CACHE_KEYS.CREATORS,
+
+      responseData,
+
+      CACHE_TTL.LISTS
+
+    );
+
+
+    return res.json(
+      responseData
+    );
+
+  } catch (err) {
+
+    console.error(
+      "GET ALL CREATORS ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
+};
+
+
+// ============================================================
+// GET MEMBERSHIPS
+// ============================================================
+
+exports.getMemberships = async (req, res) => {
+
+  try {
+
+    const cachedMemberships =
+      await getCache(
+        CACHE_KEYS.MEMBERSHIPS
+      );
+
+
+    if (cachedMemberships) {
+
+      console.log(
+        "⚡ Memberships served from Redis"
+      );
+
+      return res.json(
+        cachedMemberships
+      );
+
+    }
+
+
+    const members =
+      await User.find({
+
+        role:
+          "fan",
+
+      })
+        .select("-password")
+        .sort({
+          createdAt: -1,
+        })
+        .lean();
+
+
+    const stats = {
+
+      total:
+        members.length,
+
+      free:
+        members.filter(
+          (m) =>
+            m.membership?.plan ===
+            "FREE"
+        ).length,
+
+      vip:
+        members.filter(
+          (m) =>
+            m.membership?.plan ===
+            "VIP"
+        ).length,
+
+      elite:
+        members.filter(
+          (m) =>
+            m.membership?.plan ===
+            "ELITE"
+        ).length,
+
+      active:
+        members.filter(
+          (m) =>
+            m.membership?.status ===
+            "active"
+        ).length,
+
+      expired:
+        members.filter(
+          (m) =>
+            m.membership?.status ===
+            "expired"
+        ).length,
+
+    };
+
+
+    const responseData = {
+
+      success: true,
+
+      members,
+
+      stats,
+
+    };
+
+
+    await setCache(
+
+      CACHE_KEYS.MEMBERSHIPS,
+
+      responseData,
+
+      CACHE_TTL.LISTS
+
+    );
+
+
+    return res.json(
+      responseData
+    );
+
+  } catch (err) {
+
+    console.error(
+      "GET MEMBERSHIPS ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
+};
+
+
+// ============================================================
+// DELETE USER
+// ============================================================
+
+exports.deleteUser = async (req, res) => {
+
+  try {
+
+    const {
+      id,
+    } = req.params;
+
+
+    const user =
+      await User.findById(
+        id
+      );
+
+
+    if (!user) {
+
+      return res.status(404).json({
+
+        success: false,
+
+        message:
+          "User not found",
+
+      });
+
+    }
+
+
+    await User.findByIdAndDelete(
+      id
+    );
+
+
+    await invalidateAdminCache();
+
+
+    return res.json({
+
+      success: true,
+
+      message:
+        "User deleted successfully",
+
+    });
+
+  } catch (err) {
+
+    console.error(
+      "DELETE USER ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
+};
+
+
+// ============================================================
+// GET REVIEWED CONTENT
+// ============================================================
+
+exports.getReviewedContent = async (req, res) => {
+
+  try {
+
+    const cachedContent =
+      await getCache(
+        CACHE_KEYS.REVIEWED_CONTENT
+      );
+
+
+    if (cachedContent) {
+
+      console.log(
+        "⚡ Reviewed content served from Redis"
+      );
+
+      return res.json(
+        cachedContent
+      );
+
+    }
+
+
+    const content =
+      await Content.find({
+
+        status: {
+
+          $in: [
+
+            "scheduled",
+
+            "published",
+
+            "rejected",
+
+            "changes_requested",
+
+          ],
+
+        },
+
+      })
+        .populate(
+
+          "creatorId",
+
+          "name creatorApplication profileImage"
+
+        )
+        .sort({
+
+          reviewedAt:
+            -1,
+
+        })
+        .lean();
+
+
+    const responseData = {
+
+      success: true,
+
+      content,
+
+    };
+
+
+    await setCache(
+
+      CACHE_KEYS.REVIEWED_CONTENT,
+
+      responseData,
+
+      CACHE_TTL.LISTS
+
+    );
+
+
+    return res.json(
+      responseData
+    );
+
+  } catch (err) {
+
+    console.error(
+      "GET REVIEWED CONTENT ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+
+      success: false,
+
+      error: err.message,
+
+    });
+
+  }
+
 };
