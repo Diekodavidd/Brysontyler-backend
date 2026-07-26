@@ -25,7 +25,7 @@ const {
   approvePayout,
   declinePayout,
   processPayout,
-  completePayout,getReports,
+  completePayout,getAdminReports,
 } = require("../controllers_/adminController");
 const auth = require('../middleware_/authMiddleware');
 const role = require('../middleware_/roleMiddleware');
@@ -65,7 +65,7 @@ router.get(
   "/reports",
   auth,
   role(["admin"]),
-  getReports
+  getAdminReports
 );
 
 router.get(
