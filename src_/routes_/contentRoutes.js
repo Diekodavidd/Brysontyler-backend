@@ -57,20 +57,25 @@ router.post(
 
 router.post(
   "/upload-brand",
-  (req, res, next) => {
-    console.log("ROUTE HIT");
-    next();
-  },
   auth,
   role(["admin"]),
-  upload.fields([
-    { name: "video", maxCount: 1 },
-    { name: "preview", maxCount: 1 },
-    { name: "thumbnail", maxCount: 1 },
-  ]),
   (req, res, next) => {
-    console.log("MULTER FINISHED");
-    next();
+    upload.fields([
+      { name: "video", maxCount: 1 },
+      { name: "preview", maxCount: 1 },
+      { name: "thumbnail", maxCount: 1 },
+    ])(req, res, (err) => {
+      if (err) {
+        console.error("MULTER ERROR:", err);
+        return res.status(500).json({
+          success: false,
+          error: err.message,
+        });
+      }
+
+      console.log("MULTER FINISHED");
+      next();
+    });
   },
   uploadBrandContent
 );
