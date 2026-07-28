@@ -1299,16 +1299,12 @@ exports.getBrandGallery = async (req, res) => {
 
 exports.deleteBrandVideo = async (req, res) => {
   try {
+    const content = await Content.findById(req.params.id);
 
-    const video =
-      await Content.findById(
-        req.params.id
-      );
-
-    if (!video) {
+    if (!content) {
       return res.status(404).json({
         success: false,
-        error: "Video not found.",
+        error: "Content not found.",
       });
     }
 
@@ -1317,7 +1313,8 @@ exports.deleteBrandVideo = async (req, res) => {
     // -----------------------------------------
 
     if (
-      video.ownerType !== "brand"
+      content.ownerType !== "brand" &&
+      content.type !== "brand"
     ) {
       return res.status(400).json({
         success: false,
@@ -1326,119 +1323,142 @@ exports.deleteBrandVideo = async (req, res) => {
       });
     }
 
-    // -----------------------------------------
-    // DELETE VIDEO FROM BUNNY
-    // -----------------------------------------
-
-    if (video.storageKey) {
-
-      try {
-
-        await axios.delete(
-          `${process.env.BUNNY_STORAGE_HOST}/${process.env.BUNNY_STORAGE_ZONE}/${video.storageKey}`,
-          {
-            headers: {
-              AccessKey:
-                process.env.BUNNY_STORAGE_PASSWORD,
-            },
-          }
-        );
-
-      } catch (bunnyError) {
-
-        console.error(
-          "BUNNY DELETE ERROR:",
-          bunnyError.response?.data ||
-          bunnyError.message
-        );
-
-      }
-
-    }
-
-    // -----------------------------------------
-    // DELETE PREVIEW FROM BUNNY
-    // -----------------------------------------
-
-    if (video.previewStorageKey) {
-
-      try {
-
-        await axios.delete(
-          `${process.env.BUNNY_STORAGE_HOST}/${process.env.BUNNY_STORAGE_ZONE}/${video.previewStorageKey}`,
-          {
-            headers: {
-              AccessKey:
-                process.env.BUNNY_STORAGE_PASSWORD,
-            },
-          }
-        );
-
-      } catch (bunnyError) {
-
-        console.error(
-          "BUNNY PREVIEW DELETE ERROR:",
-          bunnyError.response?.data ||
-          bunnyError.message
-        );
-
-      }
-
-    }
-
-    // -----------------------------------------
-    // DELETE THUMBNAIL FROM CLOUDINARY
-    // -----------------------------------------
+    // =========================================
+    // DELETE BRAND VIDEO FROM BUNNY
+    // =========================================
 
     if (
-      video.thumbnailCloudinaryId
+      content.mediaType?.toLowerCase() === "video" &&
+      content.storageKey
     ) {
-
       try {
-
-        await cloudinary.uploader.destroy(
-          video.thumbnailCloudinaryId
+        await axios.delete(
+          `${process.env.BUNNY_STORAGE_HOST}/${process.env.BUNNY_STORAGE_ZONE}/${content.storageKey}`,
+          {
+            headers: {
+              AccessKey:
+                process.env.BUNNY_STORAGE_PASSWORD,
+            },
+          }
         );
 
-      } catch (cloudinaryError) {
-
+        console.log(
+          "Deleted Bunny video:",
+          content.storageKey
+        );
+      } catch (err) {
         console.error(
-          "CLOUDINARY DELETE ERROR:",
-          cloudinaryError.message
+          "BUNNY VIDEO DELETE ERROR:",
+          err.response?.data || err.message
         );
-
       }
-
     }
 
-    // -----------------------------------------
+    // =========================================
+    // DELETE PREVIEW
+    // =========================================
+
+    if (content.previewStorageKey) {
+      try {
+        await axios.delete(
+          `${process.env.BUNNY_STORAGE_HOST}/${process.env.BUNNY_STORAGE_ZONE}/${content.previewStorageKey}`,
+          {
+            headers: {
+              AccessKey:
+                process.env.BUNNY_STORAGE_PASSWORD,
+            },
+          }
+        );
+
+        console.log(
+          "Deleted Bunny preview:",
+          content.previewStorageKey
+        );
+      } catch (err) {
+        console.error(
+          "BUNNY PREVIEW DELETE ERROR:",
+          err.response?.data || err.message
+        );
+      }
+    }
+
+    // =========================================
+    // DELETE IMAGE GALLERY FROM BUNNY
+    // =========================================
+
+    if (
+      content.mediaType?.toLowerCase() === "image" &&
+      Array.isArray(content.images)
+    ) {
+      for (const image of content.images) {
+        if (!image.storageKey) continue;
+
+        try {
+          await axios.delete(
+            `${process.env.BUNNY_STORAGE_HOST}/${process.env.BUNNY_STORAGE_ZONE}/${image.storageKey}`,
+            {
+              headers: {
+                AccessKey:
+                  process.env.BUNNY_STORAGE_PASSWORD,
+              },
+            }
+          );
+
+          console.log(
+            "Deleted Bunny image:",
+            image.storageKey
+          );
+        } catch (err) {
+          console.error(
+            "BUNNY IMAGE DELETE ERROR:",
+            err.response?.data || err.message
+          );
+        }
+      }
+    }
+
+    // =========================================
+    // DELETE THUMBNAIL
+    // =========================================
+
+    if (content.thumbnailCloudinaryId) {
+      try {
+        await cloudinary.uploader.destroy(
+          content.thumbnailCloudinaryId
+        );
+      } catch (err) {
+        console.error(
+          "CLOUDINARY DELETE ERROR:",
+          err.message
+        );
+      }
+    }
+
+    // =========================================
     // DELETE DATABASE RECORD
-    // -----------------------------------------
+    // =========================================
 
-    await video.deleteOne();
+    await content.deleteOne();
 
-    // -----------------------------------------
-    // CLEAR BRAND GALLERY CACHE
-    // -----------------------------------------
+    // =========================================
+    // CLEAR CACHE
+    // =========================================
 
     await deleteCacheByPattern(
       `${CACHE_KEYS.BRAND_GALLERY}*`
     );
 
-    // -----------------------------------------
-    // RESPONSE
-    // -----------------------------------------
-
     return res.json({
       success: true,
-      message:
-        "Brand video deleted successfully.",
+      message: `${
+        content.mediaType === "image"
+          ? "Gallery"
+          : "Video"
+      } deleted successfully.`,
     });
-
   } catch (err) {
-
     console.error(
-      "DELETE BRAND VIDEO ERROR:",
+      "DELETE BRAND CONTENT ERROR:",
       err
     );
 

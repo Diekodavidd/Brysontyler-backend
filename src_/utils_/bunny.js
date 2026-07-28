@@ -73,25 +73,21 @@ const uploadToBunny = async (
     const stream =
       fs.createReadStream(filePath);
 
-    await axios.put(
-      uploadUrl,
-      stream,
-      {
-        headers: {
-          AccessKey:
-            STORAGE_PASSWORD,
+   await axios.put(
+  uploadUrl,
+  stream,
+  {
+    headers: {
+      AccessKey: STORAGE_PASSWORD,
+      "Content-Type": "application/octet-stream",
+    },
 
-          "Content-Type":
-            "application/octet-stream",
-        },
+    maxBodyLength: Infinity,
+    maxContentLength: Infinity,
 
-        maxBodyLength:
-          Infinity,
-
-        maxContentLength:
-          Infinity,
-      }
-    );
+    timeout: 0, // VERY IMPORTANT
+  }
+);
 
     console.log(
       "BUNNY UPLOAD SUCCESS:",

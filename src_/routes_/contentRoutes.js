@@ -5,6 +5,10 @@ const router = express.Router();
 
 const upload = multer({
     dest: "uploads/",
+
+    limits: {
+        fileSize: 10 * 1024 * 1024 * 1024, // 10GB
+    },
 });
 
 const auth = require("../middleware_/authMiddleware");
