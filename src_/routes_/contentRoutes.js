@@ -56,24 +56,23 @@ router.post(
 ===================================================== */
 
 router.post(
-    "/upload-brand",
- auth,
-    role(["admin"]),
-    upload.fields([
-        {
-            name: "video",
-            maxCount: 1,
-        },
-        {
-            name: "preview",
-            maxCount: 1,
-        },
-        {
-            name: "thumbnail",
-            maxCount: 1,
-        },
-    ]),
-    uploadBrandContent
+  "/upload-brand",
+  (req, res, next) => {
+    console.log(">>> upload-brand route hit");
+    next();
+  },
+  auth,
+  role(["admin"]),
+  upload.fields([
+    { name: "video", maxCount: 1 },
+    { name: "preview", maxCount: 1 },
+    { name: "thumbnail", maxCount: 1 },
+  ]),
+  (req, res, next) => {
+    console.log(">>> multer finished");
+    next();
+  },
+  uploadBrandContent
 );
 router.post(
   "/upload-brand-gallery",

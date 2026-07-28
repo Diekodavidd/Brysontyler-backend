@@ -903,7 +903,7 @@ exports.searchContent = async (req, res) => {
 
 exports.uploadBrandContent = async (req, res) => {
   console.log("REQ.USER:", req.user);
-
+console.log(">>> uploadBrandContent started");
   try {
     const video = req.files?.video?.[0];
     const preview = req.files?.preview?.[0];
