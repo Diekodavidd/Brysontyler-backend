@@ -58,7 +58,7 @@ router.post(
 router.post(
   "/upload-brand",
   (req, res, next) => {
-    console.log(">>> upload-brand route hit");
+    console.log("ROUTE HIT");
     next();
   },
   auth,
@@ -69,7 +69,7 @@ router.post(
     { name: "thumbnail", maxCount: 1 },
   ]),
   (req, res, next) => {
-    console.log(">>> multer finished");
+    console.log("MULTER FINISHED");
     next();
   },
   uploadBrandContent
