@@ -46,12 +46,53 @@ const PaymentSchema = new mongoose.Schema(
       type: String,
       default: "USD",
     },
+bankTransfer: {
 
-    paymentProvider: {
+    bankName: String,
+
+    accountName: String,
+
+    accountNumber: String,
+
+    reference: String,
+
+    amountUsd: Number,
+
+    amountNaira: Number,
+
+    exchangeRate: Number,
+
+    receiptUrl: String,
+
+    receiptStatus: {
+        type: String,
+        enum: [
+            "not_uploaded",
+            "uploaded",
+            "approved",
+            "rejected",
+        ],
+        default: "not_uploaded",
+    },
+
+    uploadedAt: Date,
+
+    verifiedAt: Date,
+
+    verifiedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+    },
+
+    rejectionReason: String,
+
+},
+   paymentProvider: {
     type: String,
     enum: [
         "nowpayments",
         "paxum",
+        "bank_transfer",
         "stripe",
         "flutterwave",
         "paystack",
@@ -70,9 +111,28 @@ const PaymentSchema = new mongoose.Schema(
     invoiceUrl: String,
 
     paymentStatus: {
-      type: String,
-      default: "waiting",
-    },
+    type: String,
+    enum: [
+
+"waiting",             // crypto waiting
+
+"pending",             // bank transfer created
+
+"receipt_uploaded",
+
+"pending_verification",
+
+"finished",
+
+"failed",
+
+"cancelled",
+
+"rejected",
+
+],
+    default: "waiting",
+},
 
     walletAmount: {
       type: Number,
@@ -111,6 +171,7 @@ validUntil: Date,
       type: Number,
       default: 0,
     },
+    
 
     txHash: String,
 

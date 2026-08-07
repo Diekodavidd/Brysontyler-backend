@@ -25,13 +25,9 @@ const createNotification = async ({
 
     return notification;
   } catch (error) {
-    console.error(
-      "Create notification error:",
-      error.message
-    );
-
-    return null;
-  }
+  console.error("Create notification error:", error);
+  throw error;
+}
 };
 
 module.exports = createNotification;

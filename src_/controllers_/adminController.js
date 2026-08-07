@@ -2814,3 +2814,539 @@ exports.getAdminReports = async (req, res) => {
 
   }
 };
+
+exports.manualUpgradeMembership = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const {
+      plan,
+      duration = 30,
+    } = req.body;
+
+    if (!["VIP", "ELITE"].includes(plan)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid membership plan.",
+      });
+    }
+
+    const user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Fan not found.",
+      });
+    }
+
+    if (user.role !== "fan") {
+      return res.status(400).json({
+        success: false,
+        message: "Membership can only be assigned to fans.",
+      });
+    }
+
+    const startDate = new Date();
+
+    const endDate = new Date(startDate);
+
+    endDate.setDate(endDate.getDate() + Number(duration));
+
+    let membership =
+      await Membership.findOne({
+        userId: user._id,
+      });
+
+    if (!membership) {
+      membership = await Membership.create({
+        userId: user._id,
+        plan,
+        amount: 0,
+        currency: "USD",
+        provider: "ADMIN",
+        status: "active",
+        paymentStatus: "manual",
+        orderId: `ADMIN_${Date.now()}_${user._id}`,
+        startDate,
+        endDate,
+      });
+    } else {
+      membership.plan = plan;
+      membership.amount = 0;
+      membership.provider = "ADMIN";
+      membership.status = "active";
+      membership.paymentStatus = "manual";
+      membership.startDate = startDate;
+      membership.endDate = endDate;
+
+      await membership.save();
+    }
+
+    user.membership = {
+      plan,
+      status: "active",
+      startDate,
+      endDate,
+    };
+
+    await user.save();
+
+    return res.json({
+      success: true,
+      message: `${user.name} upgraded to ${plan}.`,
+      membership,
+      user,
+    });
+  } catch (err) {
+    console.error(
+      "MANUAL MEMBERSHIP ERROR:",
+      err
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+const paymentService = require("../payments/payment.service");
+
+exports.getBankTransferReceipts = async (req, res) => {
+    try {
+
+
+       const payments = await Payment.find({
+    paymentProvider: "bank_transfer",
+    paymentStatus: "pending_verification",
+    "bankTransfer.receiptStatus": "uploaded",
+})
+.populate("userId", "name email profileImage")
+.sort({ createdAt: -1 });
+
+console.log(payments);
+
+        return res.json({
+            success: true,
+            payments,
+        });
+
+    } catch (err) {
+
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+
+    }
+};
+
+
+exports.approveBankTransferReceipt = async (req, res) => {
+
+    try {
+
+        const payment =
+            await Payment.findById(req.params.id);
+
+        if (!payment) {
+            return res.status(404).json({
+                success: false,
+                message: "Payment not found.",
+            });
+        }
+
+        if (payment.paymentProvider !== "bank_transfer") {
+            return res.status(400).json({
+                success: false,
+                message: "Not a bank transfer payment.",
+            });
+        }
+
+        if (payment.completed) {
+            return res.status(400).json({
+                success: false,
+                message: "Payment already completed.",
+            });
+        }
+
+       payment.paymentStatus = "finished";
+
+payment.bankTransfer.receiptStatus = "approved";
+
+payment.bankTransfer.verifiedAt = new Date();
+
+payment.bankTransfer.verifiedBy = req.user._id;
+
+await payment.save();
+
+await paymentService.completePayment(payment);
+
+        return res.json({
+            success: true,
+            message: "Receipt approved successfully.",
+        });
+
+    } catch (err) {
+
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+
+    }
+
+};
+
+exports.rejectBankTransferReceipt = async (req, res) => {
+
+    try {
+
+        const { reason } = req.body;
+
+        const payment =
+            await Payment.findById(req.params.id);
+
+        if (!payment) {
+            return res.status(404).json({
+                success: false,
+                message: "Payment not found.",
+            });
+        }
+
+        payment.paymentStatus = "rejected";
+
+payment.bankTransfer.receiptStatus = "rejected";
+
+payment.bankTransfer.rejectionReason = reason || "";
+
+await payment.save();
+
+
+        return res.json({
+            success: true,
+            message: "Receipt rejected.",
+        });
+
+    } catch (err) {
+
+        return res.status(500).json({
+            success: false,
+            message: err.message,
+        });
+
+    }
+
+};
+
+const { AccessToken } = require("livekit-server-sdk");
+const LiveSession = require("../models_/liveSession");
+
+// ============================================
+// CREATE LIVE
+// ============================================
+
+exports.createAdminLiveSession = async (req, res) => {
+  try {
+    const {
+      title,
+      description,
+      category,
+    } = req.body;
+
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        message: "Session title is required.",
+      });
+    }
+
+    const existingSession = await LiveSession.findOne({
+      creatorId: req.user._id,
+      isLive: true,
+      isAdminLive: true,
+    });
+
+    if (existingSession) {
+      return res.status(400).json({
+        success: false,
+        message: "You already have an active admin live session.",
+      });
+    }
+
+    const roomName = `admin-live-${Date.now()}`;
+
+    const token = new AccessToken(
+      process.env.LIVEKIT_API_KEY,
+      process.env.LIVEKIT_API_SECRET,
+      {
+        identity: req.user.name,
+      }
+    );
+
+    token.addGrant({
+      roomJoin: true,
+      room: roomName,
+      canPublish: true,
+      canSubscribe: true,
+    });
+
+    const jwt = await token.toJwt();
+
+    const session = await LiveSession.create({
+      creatorId: req.user._id,
+      roomName,
+      title,
+      description,
+      category,
+      isAdminLive: true,
+      isLive: true,
+    });
+
+    return res.status(201).json({
+      success: true,
+      session,
+      token: jwt,
+      roomName,
+      joinUrl: `${process.env.LIVEKIT_URL}/${roomName}`,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+// ============================================
+// MY LIVE SESSIONS
+// ============================================
+
+exports.getAdminLiveSessions = async (req, res) => {
+  try {
+    const sessions = await LiveSession.find({
+      creatorId: req.user._id,
+    }).sort({
+      createdAt: -1,
+    });
+
+    return res.json({
+      success: true,
+      sessions,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+// ============================================
+// CURRENT LIVE
+// ============================================
+
+exports.getCurrentAdminLive = async (req, res) => {
+  try {
+    const session = await LiveSession.findOne({
+      creatorId: req.user._id,
+      isLive: true,
+    });
+
+    return res.json({
+      success: true,
+      session,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+// ============================================
+// LIVE STATS
+// ============================================
+
+exports.getAdminLiveStats = async (req, res) => {
+  try {
+    const sessions = await LiveSession.find({
+      creatorId: req.user._id,
+    });
+
+    const stats = {
+      totalStreams: sessions.length,
+      totalViews: sessions.reduce(
+        (sum, s) => sum + (s.totalViews || s.viewers || 0),
+        0
+      ),
+      totalTips: sessions.reduce(
+        (sum, s) => sum + (s.totalTips || 0),
+        0
+      ),
+      followersWatching: sessions
+        .filter((s) => s.isLive)
+        .reduce((sum, s) => sum + (s.viewers || 0), 0),
+    };
+
+    return res.json({
+      success: true,
+      stats,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+// ============================================
+// END LIVE
+// ============================================
+
+exports.endAdminLiveSession = async (req, res) => {
+  try {
+    const session = await LiveSession.findById(req.params.id);
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Live session not found.",
+      });
+    }
+
+    if (
+      session.creatorId.toString() !==
+      req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized.",
+      });
+    }
+
+    session.isLive = false;
+
+    await session.save();
+
+    return res.json({
+      success: true,
+      message: "Live session ended.",
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+
+
+exports.getAdminLiveSessionById = async (req, res) => {
+  try {
+    const session = await LiveSession.findById(req.params.id);
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Live session not found.",
+      });
+    }
+
+    return res.json({
+      success: true,
+      session,
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+exports.joinAdminLiveSession = async (req, res) => {
+  try {
+    const session = await LiveSession.findById(req.params.id);
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Live session not found.",
+      });
+    }
+
+    if (!session.isLive) {
+      return res.status(400).json({
+        success: false,
+        message: "This live session has ended.",
+      });
+    }
+
+    const token = new AccessToken(
+      process.env.LIVEKIT_API_KEY,
+      process.env.LIVEKIT_API_SECRET,
+      {
+        identity: req.user.name,
+      }
+    );
+
+    token.addGrant({
+      roomJoin: true,
+      room: session.roomName,
+      canPublish: true,
+      canSubscribe: true,
+    });
+
+    session.viewers += 1;
+    await session.save();
+
+    return res.json({
+      success: true,
+      token: await token.toJwt(),
+      roomName: session.roomName,
+      session,
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+exports.leaveAdminLiveSession = async (req, res) => {
+  try {
+    const session = await LiveSession.findById(req.params.id);
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: "Live session not found.",
+      });
+    }
+
+    if (session.viewers > 0) {
+      session.viewers -= 1;
+    }
+
+    await session.save();
+
+    return res.json({
+      success: true,
+      message: "Left live session.",
+    });
+
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};

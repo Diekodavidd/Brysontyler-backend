@@ -1,4 +1,5 @@
 const { AccessToken } = require('livekit-server-sdk');
+const User = require("../models_/user");
 const LiveSession = require("../models_/liveSession");
 
 exports.createLiveSession = async (req, res) => {
@@ -259,4 +260,109 @@ exports.endLiveSession = async (req, res) => {
         });
 
     }
+};
+
+
+exports.likeLive = async (req, res) => {
+    const session = await LiveSession.findById(req.params.id);
+
+    if (!session) {
+        return res.status(404).json({
+            success: false,
+            message: "Live session not found",
+        });
+    }
+
+const alreadyLiked = session.likedBy.some(
+    id => id.toString() === req.user._id.toString()
+);
+    if (alreadyLiked) {
+        return res.json({
+            success: true,
+            likes: session.likes,
+            liked: true,
+        });
+    }
+
+    session.likes += 1;
+    session.likedBy.push(req.user._id);
+
+    await session.save();
+
+    res.json({
+        success: true,
+        likes: session.likes,
+        liked: true,
+    });
+};
+
+exports.tipLive = async (req, res) => {
+
+    try {
+
+        const { coinType, quantity } = req.body;
+
+        const session = await LiveSession.findById(req.params.id);
+
+        if (!session) {
+            return res.status(404).json({
+                success: false,
+                message: "Live session not found",
+            });
+        }
+
+        const sender = await User.findById(req.user._id);
+
+        const creator = await User.findById(session.creatorId);
+
+        if (!creator) {
+            return res.status(404).json({
+                success: false,
+                message: "Creator not found",
+            });
+        }
+
+        if (!["gold", "silver", "ruby"].includes(coinType)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid coin type",
+            });
+        }
+
+        if (sender.coinBalances[coinType] < quantity) {
+            return res.status(400).json({
+                success: false,
+                message: `Not enough ${coinType} coins`,
+            });
+        }
+
+        sender.coinBalances[coinType] -= quantity;
+
+        creator.coinBalances[coinType] += quantity;
+
+        session.tips += quantity;
+
+        await Promise.all([
+            sender.save(),
+            creator.save(),
+            session.save(),
+        ]);
+
+        res.json({
+            success: true,
+            tips: session.tips,
+            coinBalances: sender.coinBalances,
+        });
+
+    } catch (err) {
+
+        console.error(err);
+
+        res.status(500).json({
+            success: false,
+            message: "Server Error",
+        });
+
+    }
+
 };

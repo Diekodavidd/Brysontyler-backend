@@ -8,7 +8,7 @@ const {
     getLiveSessionById,
     joinLiveSession,
     leaveLiveSession,
-    endLiveSession
+    endLiveSession,likeLive,tipLive
 } = require("../controllers_/liveController");
 
 const auth = require("../middleware_/authMiddleware");
@@ -59,4 +59,8 @@ router.patch(
     endLiveSession
 );
 
+
+router.post("/:id/like", auth, likeLive);
+
+router.post("/:id/tip", auth, tipLive);
 module.exports = router;

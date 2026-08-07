@@ -4,6 +4,7 @@ const Subscription = require("../models_/subscription");
 const Payment = require("../models_/payment");
 const content = require("../models_/content");
 
+const cloudinary = require("../utils_/cloudinary");
 
 // ==============================
 // Dashboard
@@ -491,6 +492,77 @@ exports.getSubscriptions = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
+
+exports.uploadBankReceipt = async (req, res) => {
+  try {
+    const { paymentId } = req.params;
+
+    const payment = await Payment.findById(paymentId);
+
+    if (!payment) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment not found.",
+      });
+    }
+
+    if (
+      payment.userId.toString() !==
+      req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Unauthorized.",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Receipt is required.",
+      });
+    }
+
+    const upload = await new Promise(
+      (resolve, reject) => {
+        cloudinary.uploader
+          .upload_stream(
+            {
+              folder: "bank-receipts",
+            },
+            (err, result) => {
+              if (err) reject(err);
+              else resolve(result);
+            }
+          )
+          .end(req.file.buffer);
+      }
+    );
+
+  payment.bankTransfer.receiptUrl = upload.secure_url;
+
+payment.bankTransfer.uploadedAt = new Date();
+
+payment.bankTransfer.receiptStatus = "uploaded";
+
+payment.paymentStatus = "pending_verification";
+
+    await payment.save();
+
+    return res.json({
+      success: true,
+      payment,
+      message:
+        "Receipt uploaded successfully. Verification may take up to 24 hours.",
+    });
+  } catch (err) {
+    return res.status(500).json({
       success: false,
       message: err.message,
     });

@@ -1,7 +1,7 @@
 const Payment = require("../models_/payment");
 const User = require("../models_/user");
 const Subscription = require("../models_/subscription");
-
+const createNotification = require("../utils_/createNotification");
 const {
     resolveProvider,
 } = require("./providers/provider.factory");
@@ -77,7 +77,17 @@ payAmount:
 
 payCurrency:
     invoice.pay_currency || null,
+bankName:
+    invoice.bankName || null,
 
+bankAccountName:
+    invoice.bankAccountName || null,
+
+bankAccountNumber:
+    invoice.bankAccountNumber || null,
+
+reference:
+    invoice.reference || null,
 network:
     invoice.network || null,
 
@@ -85,7 +95,7 @@ validUntil:
     invoice.valid_until || null,
 
 paymentStatus:
-    invoice.payment_status || "waiting",
+    invoice.payment_status || "pending",
         walletAmount,
 
         coinPurchase,
@@ -115,36 +125,51 @@ const generateOrderId = (
  * using the selected provider.
  */
 const createInvoice = async ({
-
     providerName,
-
     amount,
-
     currency = "USD",
-
     orderId,
-
     description,
-
 }) => {
 
-    const provider =
-        resolveProvider(providerName);
+    // ===============================
+    // MANUAL BANK TRANSFER
+    // ===============================
+    if (providerName === "bank_transfer") {
 
-   return provider.createInvoice({
+        return {
+            payment_id: null,
+            invoice_url: null,
+            payment_status: "pending",
 
-    amount,
+            bankName: "Zenith Bank",
+            bankAccountName: "Bryson Tyler Productions",
+            bankAccountNumber: "0123456789",
 
-    currency,
+            reference: `PAY-${Date.now()}`,
+        };
+    }
 
-    orderId,
+    // ===============================
+    // API PROVIDERS
+    // ===============================
 
-    description,
+    const provider = resolveProvider(providerName);
 
-    callbackUrl:
-        `${process.env.BACKEND_URL}/payments/webhook/${providerName}`,
+    return provider.createInvoice({
 
-});
+        amount,
+
+        currency,
+
+        orderId,
+
+        description,
+
+        callbackUrl:
+            `${process.env.BACKEND_URL}/payments/webhook/${providerName}`,
+
+    });
 
 };
 

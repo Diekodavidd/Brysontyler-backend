@@ -25,8 +25,21 @@ const {
   approvePayout,
   declinePayout,
   processPayout,
-  completePayout,getAdminReports,
+  completePayout,getAdminReports,manualUpgradeMembership,
+  getBankTransferReceipts,approveBankTransferReceipt,rejectBankTransferReceipt,
+  createAdminLiveSession,
+  getAdminLiveSessions,
+  getCurrentAdminLive,
+  getAdminLiveStats,
+  endAdminLiveSession,
 } = require("../controllers_/adminController");
+
+const {
+  getAdminLiveSessionById,
+  joinAdminLiveSession,
+  leaveAdminLiveSession,
+} = require("../controllers_/adminController");
+
 const auth = require('../middleware_/authMiddleware');
 const role = require('../middleware_/roleMiddleware');
 
@@ -165,6 +178,95 @@ router.patch(
   auth,
   role(["admin"]),
   completePayout
+);
+
+router.patch(
+  "/fans/:id/membership",
+  auth,
+  role(["admin"]),
+  manualUpgradeMembership
+);
+
+
+router.get(
+    "/payments/bank-transfer",
+    auth,
+  role(["admin"]),
+    getBankTransferReceipts
+);
+
+router.patch(
+    "/payments/bank-transfer/:id/approve",
+    auth,
+  role(["admin"]),
+    approveBankTransferReceipt
+);
+
+router.patch(
+    "/payments/bank-transfer/:id/reject",
+    auth,
+  role(["admin"]),
+    rejectBankTransferReceipt
+);
+
+// =====================================
+// ADMIN LIVE
+// =====================================
+
+router.get(
+  "/live",
+  auth,
+  role(["admin"]),
+  getAdminLiveSessions
+);
+
+router.get(
+  "/live/current",
+  auth,
+  role(["admin"]),
+  getCurrentAdminLive
+);
+
+router.get(
+  "/live/stats",
+  auth,
+  role(["admin"]),
+  getAdminLiveStats
+);
+
+router.post(
+  "/live/create",
+  auth,
+  role(["admin"]),
+  createAdminLiveSession
+);
+
+router.post(
+  "/live/end/:id",
+  auth,
+  role(["admin"]),
+  endAdminLiveSession
+);
+
+router.get(
+  "/live/:id",
+  auth,
+  role(["admin"]),
+  getAdminLiveSessionById
+);
+
+router.post(
+  "/live/:id/join",
+  auth,
+  role(["admin"]),
+  joinAdminLiveSession
+);
+
+router.post(
+  "/live/:id/leave",
+  auth,
+  role(["admin"]),
+  leaveAdminLiveSession
 );
 module.exports = router;
 

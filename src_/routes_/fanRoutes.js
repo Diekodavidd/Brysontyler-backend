@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-
+const uploadReceipt = require("../middleware_/uploadReceipt");
 const auth = require("../middleware_/authMiddleware");
 
 const {
@@ -14,7 +14,7 @@ const {
     getPaymentMethods,
     savePaymentMethod,
     getActivity,
-    getSubscriptions,getCreatorById
+    getSubscriptions,getCreatorById,uploadBankReceipt
 } = require("../controllers_/fanController");
 
 router.get("/dashboard", auth, getDashboard);
@@ -50,5 +50,12 @@ router.get(
 router.get(
   "/creator/:id",
   getCreatorById
+);
+
+router.patch(
+  "/payments/:paymentId/receipt",
+  auth,
+  uploadReceipt.single("receipt"),
+  uploadBankReceipt
 );
 module.exports = router;
