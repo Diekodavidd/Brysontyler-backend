@@ -8,7 +8,7 @@ const {
     getLiveSessionById,
     joinLiveSession,
     leaveLiveSession,
-    endLiveSession,likeLive,tipLive
+    endLiveSession,likeLive,tipLive,deleteLiveSession
 } = require("../controllers_/liveController");
 
 const auth = require("../middleware_/authMiddleware");
@@ -59,7 +59,11 @@ router.patch(
     endLiveSession
 );
 
-
+router.delete(
+    "/delete/:id",
+    auth,
+    deleteLiveSession
+);
 router.post("/:id/like", auth, likeLive);
 
 router.post("/:id/tip", auth, tipLive);

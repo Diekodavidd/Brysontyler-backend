@@ -229,36 +229,52 @@ exports.leaveLiveSession = async (req, res) => {
 
 exports.endLiveSession = async (req, res) => {
     try {
-
         const session = await LiveSession.findById(req.params.id);
 
         if (!session) {
             return res.status(404).json({
-                error: "Live session not found."
+                success: false,
+                message: "Live session not found.",
             });
         }
 
-        if (session.creatorId.toString() !== req.user._id.toString()) {
+        if (
+            session.creatorId.toString() !==
+            req.user._id.toString()
+        ) {
             return res.status(403).json({
-                error: "Unauthorized."
+                success: false,
+                message: "Unauthorized.",
+            });
+        }
+
+        if (!session.isLive) {
+            return res.status(400).json({
+                success: false,
+                message: "Live session has already ended.",
             });
         }
 
         session.isLive = false;
+        session.status = "ended";
+        session.endedAt = new Date();
 
         await session.save();
 
-        res.json({
+        return res.json({
             success: true,
-            message: "Live session ended."
+            message: "Live session ended.",
+            session,
         });
 
     } catch (error) {
+        console.error("END LIVE SESSION ERROR:", error);
 
-        res.status(500).json({
-            error: error.message
+        return res.status(500).json({
+            success: false,
+            message: "Failed to end live session.",
+            error: error.message,
         });
-
     }
 };
 
@@ -365,4 +381,53 @@ exports.tipLive = async (req, res) => {
 
     }
 
+};
+
+exports.deleteLiveSession = async (req, res) => {
+    try {
+        const session = await LiveSession.findById(req.params.id);
+
+        if (!session) {
+            return res.status(404).json({
+                success: false,
+                message: "Live session not found.",
+            });
+        }
+
+        // Only the creator/admin who owns the session can delete it
+        if (
+            session.creatorId.toString() !==
+            req.user._id.toString()
+        ) {
+            return res.status(403).json({
+                success: false,
+                message: "Unauthorized.",
+            });
+        }
+
+        // Don't allow deletion while the stream is still live
+        if (session.isLive) {
+            return res.status(400).json({
+                success: false,
+                message:
+                    "You cannot delete a live session. End the stream first.",
+            });
+        }
+
+        await LiveSession.findByIdAndDelete(req.params.id);
+
+        return res.json({
+            success: true,
+            message: "Live session deleted successfully.",
+        });
+
+    } catch (error) {
+        console.error("DELETE LIVE SESSION ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Failed to delete live session.",
+            error: error.message,
+        });
+    }
 };
